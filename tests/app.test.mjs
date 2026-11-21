@@ -43,6 +43,7 @@ function loadBaggullaeVm() {
     Promise,
     Error,
     RegExp,
+    URL,
     URLSearchParams,
     encodeURIComponent,
     decodeURIComponent,
@@ -82,7 +83,7 @@ function loadBaggullaeVm() {
   vm.runInContext(appCode, sandbox, { filename: 'src/app.js' });
   // Expose top-level lexical bindings (const/let) via helper eval inside context
   return vm.runInContext(
-    '({ S, App, detectPrivateInfo, validNick, krError, offerById, chatMessagesOf, hasChatRoom, chatWriteState, canWriteChat, unreadChatCount, unreadNotifCount, myChatRooms, onboardingProgress, homeGreeting, tempOf, matchFeed, extractStoragePath, initDemoData, CHAT_GRACE_MS })',
+    '({ S, App, detectPrivateInfo, validNick, krError, normalizeSupabaseUrl, evalPasswordSecurity, offerById, chatMessagesOf, hasChatRoom, chatWriteState, canWriteChat, unreadChatCount, unreadNotifCount, myChatRooms, onboardingProgress, homeGreeting, tempOf, matchFeed, extractStoragePath, initDemoData, CHAT_GRACE_MS })',
     sandbox
   );
 }
@@ -183,5 +184,43 @@ describe('바꿀래 핵심 로직 단위 테스트', () => {
 
     const greet = ctx.homeGreeting(ctx.S.profiles['demo-me'], Date.now());
     assert.ok(greet.length > 0);
+  });
+
+  it('normalizeSupabaseUrl: /rest/v1 등 경로를 제거하고 origin만 반환한다', () => {
+    assert.equal(
+      ctx.normalizeSupabaseUrl('https://rqldmrnvmjesizljfkhc.supabase.co/rest/v1'),
+      'https://rqldmrnvmjesizljfkhc.supabase.co'
+    );
+    assert.equal(
+      ctx.normalizeSupabaseUrl('https://rqldmrnvmjesizljfkhc.supabase.co/'),
+      'https://rqldmrnvmjesizljfkhc.supabase.co'
+    );
+    assert.equal(ctx.normalizeSupabaseUrl('{{SUPABASE_URL}}'), '');
+    assert.equal(ctx.normalizeSupabaseUrl('not-a-url'), '');
+  });
+
+  it('evalPasswordSecurity: 비밀번호 강도 단계, 규칙 충족, 확인 일치 여부를 계산한다', () => {
+    const empty = ctx.evalPasswordSecurity('', '');
+    assert.equal(empty.level, 0);
+    assert.equal(empty.match, 'empty');
+
+    const weak = ctx.evalPasswordSecurity('abc123', 'abc123');
+    assert.equal(weak.level, 1);
+    assert.equal(weak.rules.len, false);
+    assert.equal(weak.match, 'match');
+
+    const fair = ctx.evalPasswordSecurity('abcdefgh', 'abcd');
+    assert.equal(fair.level, 2);
+    assert.equal(fair.rules.len, true);
+    assert.equal(fair.match, 'mismatch');
+
+    const good = ctx.evalPasswordSecurity('abcde123', 'abcde123');
+    assert.equal(good.level, 3);
+    assert.equal(good.rules.mix, true);
+
+    const strong = ctx.evalPasswordSecurity('abcde123!', 'abcde123!');
+    assert.equal(strong.level, 4);
+    assert.equal(strong.rules.special, true);
+    assert.equal(strong.match, 'match');
   });
 });

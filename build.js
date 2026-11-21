@@ -20,7 +20,18 @@ if (fs.existsSync(envFile)) {
   }
 }
 const KEYS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'KAKAO_JS_KEY'];
-const val = k => (process.env[k] || '').trim();
+const rawVal = k => (process.env[k] || '').trim();
+const normalizeSbUrl = u => {
+  if (!u || !/^https:\/\/[^"'<>\s]+$/.test(u)) return '';
+  try {
+    const parsed = new URL(u);
+    if (parsed.pathname && parsed.pathname !== '/') {
+      console.warn(`[바꿀래] SUPABASE_URL에 경로("${parsed.pathname}")가 포함되어 있어 기본 주소("${parsed.origin}")만 사용해요.`);
+    }
+    return parsed.origin;
+  } catch (e) { return ''; }
+};
+const val = k => (k === 'SUPABASE_URL' ? normalizeSbUrl(rawVal(k)) : rawVal(k));
 const missing = KEYS.filter(k => !val(k));
 if (missing.includes('SUPABASE_URL') || missing.includes('SUPABASE_ANON_KEY')) {
   console.error(`[바꿀래] ${missing.filter(k => k !== 'KAKAO_JS_KEY').join(', ')} 값이 없어요. GitHub Secrets(또는 로컬 .env)를 확인해 주세요.`);

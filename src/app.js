@@ -71,7 +71,9 @@ const I = {
   bad:'<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="16" cy="16" r="13"/><path d="M10.5 22c1.4-2.4 3.3-3.5 5.5-3.5s4.1 1.1 5.5 3.5M11.5 12.5v1.5M20.5 12.5v1.5"/></svg>',
   cat1:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="m12 8.2 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z"/></svg>',
   cat2:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9.5 3h5v4h-5z"/><path d="M8 7h8l1 3v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-9z"/><path d="M7 13h10"/></svg>',
-  cat3:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M9 3.5c0 1.5 1.5 1.5 1.5 3M13 3.5c0 1.5 1.5 1.5 1.5 3"/></svg>'
+  cat3:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M9 3.5c0 1.5 1.5 1.5 1.5 3M13 3.5c0 1.5 1.5 1.5 1.5 3"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A9.8 9.8 0 0 1 12 5c6 0 9.5 7 9.5 7a16.8 16.8 0 0 1-3.3 4.3M6.6 6.6C4.1 8.4 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.5 0 2.9-.3 4.1-.9"/></svg>'
 };
 const PIN_SVG = '<svg viewBox="0 0 40 48"><path d="M20 46s15-14 15-26A15 15 0 0 0 5 20c0 12 15 26 15 26z" fill="var(--accent)" stroke="#fff" stroke-width="2.5"/><circle cx="20" cy="20" r="5.5" fill="#fff"/></svg>';
 
@@ -192,9 +194,19 @@ function kakaoPinImage() {
 
 /* ============ 데이터 저장소 (Supabase + 로컬 미리보기 지원) ============ */
 const CONFIG = window.APP_CONFIG || {};
-const CONFIG_OK = /^https:\/\//.test(CONFIG.supabaseUrl || '') && !!CONFIG.supabaseAnonKey && !/\{\{/.test(CONFIG.supabaseAnonKey);
+function normalizeSupabaseUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s || /\{\{/.test(s)) return '';
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+    return u.origin;
+  } catch (e) { return ''; }
+}
+const SUPABASE_URL = normalizeSupabaseUrl(CONFIG.supabaseUrl);
+const CONFIG_OK = !!SUPABASE_URL && !!CONFIG.supabaseAnonKey && !/\{\{/.test(CONFIG.supabaseAnonKey);
 const AUTOSTART = new URLSearchParams(location.search).get('autostart') === '1';
-const sb = CONFIG_OK && window.supabase ? window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey) : null;
+const sb = CONFIG_OK && window.supabase ? window.supabase.createClient(SUPABASE_URL, CONFIG.supabaseAnonKey) : null;
 const S = {profiles:{}, items:{}, offers:{}, challenges:{}, reviews:{}, favorites:{}, messages:{}, notifications:{}};
 const App = {me:null, email:'', session:false, loading:true, fetching:false, readOnly:false, demo:false, recovery:false, ch:null, online:navigator.onLine !== false};
 const PendingOps = new Map();
@@ -1333,6 +1345,92 @@ function renderAuth() {
     <div class="auth-foot">로그인은 Supabase 인증으로 안전하게 처리돼요.</div>`;
 }
 
+function evalPasswordSecurity(pw, pw2 = '') {
+  const s = String(pw || '');
+  const s2 = String(pw2 || '');
+  const len = s.length >= 8;
+  const mix = /[a-zA-Z]/.test(s) && /\d/.test(s);
+  const special = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?`~]/.test(s) || s.length >= 12;
+  let level = 0;
+  let label = '';
+  if (s.length > 0) {
+    if (!len) { level = 1; label = '보안 약함 · 8자 이상 필요해요'; }
+    else if (mix && special) { level = 4; label = '매우 안전해요'; }
+    else if (mix || special) { level = 3; label = '안전해요 · 좋은 비밀번호예요'; }
+    else { level = 2; label = '보통 · 영문과 숫자를 섞어 보세요'; }
+  }
+  const match = !s2 ? 'empty' : (s.length > 0 && s === s2 ? 'match' : 'mismatch');
+  return {level, label, rules:{len, mix, special}, match, length:s.length};
+}
+function pwFieldHtml(id, label, auto, small = '') {
+  return `<div class="field"><label for="${id}">${label}${small ? ` <small>${small}</small>` : ''}</label><div class="input-wrap pw-wrap"><input class="input" id="${id}" type="password" autocomplete="${auto}"><button type="button" class="pw-eye" data-pw-for="${id}" aria-label="${label} 보기" aria-pressed="false">${I.eye}</button></div></div>`;
+}
+function pwMeterHtml(prefix) {
+  return `<div class="pw-collapse" id="${prefix}Collapse"><div><div class="pw-sec-card" id="${prefix}Card" data-lvl="0">
+    <div class="pw-sec-head"><span class="pw-shield">${I.shield}</span><span class="pw-sec-lbl" id="${prefix}Lbl">비밀번호 보안</span><span class="pw-sec-cnt" id="${prefix}Cnt">0자</span></div>
+    <div class="pw-bars" aria-hidden="true"><span class="pw-bar"><i></i></span><span class="pw-bar"><i></i></span><span class="pw-bar"><i></i></span><span class="pw-bar"><i></i></span></div>
+    <div class="pw-rules">
+      <span class="pw-rule" data-rule="len"><span class="pw-dot">${I.check}</span>8자 이상</span>
+      <span class="pw-rule" data-rule="mix"><span class="pw-dot">${I.check}</span>영문·숫자</span>
+      <span class="pw-rule" data-rule="special"><span class="pw-dot">${I.check}</span>특수문자 또는 12자+</span>
+    </div>
+  </div></div></div>`;
+}
+function bindPwToggles(root) {
+  $$('.pw-eye', root).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inp = $('#' + btn.dataset.pwFor, root);
+      if (!inp) return;
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+      btn.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 보기');
+      btn.innerHTML = show ? I.eyeOff : I.eye;
+      inp.focus();
+    });
+  });
+}
+function bindPasswordSecurity(root, pwSel, pw2Sel, prefix) {
+  const pwEl = $(pwSel, root), pw2El = $(pw2Sel, root);
+  const col = $(`#${prefix}Collapse`, root), card = $(`#${prefix}Card`, root);
+  const lbl = $(`#${prefix}Lbl`, root), cnt = $(`#${prefix}Cnt`, root);
+  const matchEl = $(`#${prefix}Match`, root);
+  if (!pwEl || !col || !card) return;
+  let prevLvl = 0;
+  const sync = () => {
+    const res = evalPasswordSecurity(pwEl.value, pw2El ? pw2El.value : '');
+    const open = res.length > 0 || document.activeElement === pwEl;
+    col.classList.toggle('open', open);
+    card.dataset.lvl = String(res.level);
+    lbl.textContent = res.label || '안전한 비밀번호를 입력해 주세요';
+    cnt.textContent = `${res.length}자`;
+    $$('.pw-bar', card).forEach((b, i) => b.classList.toggle('on', i < res.level));
+    $$('.pw-rule', card).forEach(r => r.classList.toggle('ok', !!res.rules[r.dataset.rule]));
+    if (res.level >= 3 && prevLvl < 3) {
+      card.classList.remove('pulse'); void card.offsetWidth; card.classList.add('pulse');
+    }
+    prevLvl = res.level;
+    if (pw2El && matchEl) {
+      pw2El.classList.toggle('is-good', res.match === 'match');
+      pw2El.classList.toggle('is-bad', res.match === 'mismatch');
+      matchEl.classList.toggle('show', res.match !== 'empty');
+      matchEl.classList.toggle('ok', res.match === 'match');
+      matchEl.classList.toggle('bad', res.match === 'mismatch');
+      matchEl.innerHTML = res.match === 'match' ? `${I.check}<span>비밀번호가 일치해요</span>` : (res.match === 'mismatch' ? `${I.close}<span>비밀번호가 서로 달라요</span>` : '');
+    }
+  };
+  pwEl.addEventListener('focus', sync);
+  pwEl.addEventListener('blur', sync);
+  pwEl.addEventListener('input', sync);
+  if (pw2El) pw2El.addEventListener('input', sync);
+}
+function shakeEl(el) {
+  if (!el) return;
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+}
+
 function renderAuthForm(kind) {
   let a = $('#auth'); if (!a) { renderAuth(); a = $('#auth'); }
   a.dataset.mode = 'form';
@@ -1341,20 +1439,22 @@ function renderAuthForm(kind) {
     <div class="ob-step" style="flex:1"><h2>${up ? '이메일로<br>가입하기' : '다시 만나서<br>반가워요'}</h2><p class="lead">${up ? '로그인할 때 쓸 이메일과 비밀번호를 정해 주세요.' : '가입한 이메일과 비밀번호를 입력해 주세요.'}</p>
     <form id="authForm" novalidate>
       <div class="field"><label for="aEmail">이메일</label><input class="input" id="aEmail" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com"></div>
-      <div class="field"><label for="aPw">비밀번호${up ? ' <small>8자 이상</small>' : ''}</label><input class="input" id="aPw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}"></div>
-      ${up ? '<div class="field"><label for="aPw2">비밀번호 확인</label><input class="input" id="aPw2" type="password" autocomplete="new-password"></div>' : ''}
+      <div class="field"><label for="aPw">비밀번호${up ? ' <small>8자 이상</small>' : ''}</label><div class="input-wrap pw-wrap"><input class="input" id="aPw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}"><button type="button" class="pw-eye" data-pw-for="aPw" aria-label="비밀번호 보기" aria-pressed="false">${I.eye}</button></div>${up ? pwMeterHtml('aPw') : ''}</div>
+      ${up ? `<div class="field"><label for="aPw2">비밀번호 확인</label><div class="input-wrap pw-wrap"><input class="input" id="aPw2" type="password" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-for="aPw2" aria-label="비밀번호 확인 보기" aria-pressed="false">${I.eye}</button></div><div class="pw-match" id="aPwMatch" aria-live="polite"></div></div>` : ''}
       <div class="hint err" id="aErr" role="alert"></div>
       <button class="btn btn-primary btn-block" type="submit" id="aSubmit" style="margin-top:14px">${up ? '가입하고 프로필 만들기' : '로그인'}</button>
     </form>
     ${!up ? '<button class="btn btn-ghost btn-block" data-act="forgotPw" style="margin-top:6px">비밀번호를 잊었어요</button>' : ''}
     <button class="btn btn-ghost btn-block" data-act="${up ? 'login' : 'signup'}" style="margin-top:4px">${up ? '이미 가입했어요 · 로그인' : '처음이에요 · 회원가입'}</button></div>`;
+  bindPwToggles(a);
+  if (up) bindPasswordSecurity(a, '#aPw', '#aPw2', 'aPw');
   setTimeout(() => { const el = $('#aEmail'); el && el.focus(); }, 300);
   $('#authForm').addEventListener('submit', async e => {
     e.preventDefault();
     const email = $('#aEmail').value.trim(), pw = $('#aPw').value, err = $('#aErr');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = '이메일 형식이 맞지 않아요. name@example.com처럼 입력해 주세요.'; return; }
-    if (pw.length < 8) { err.textContent = '비밀번호가 너무 짧아요. 8자 이상으로 입력해 주세요.'; return; }
-    if (up && pw !== $('#aPw2').value) { err.textContent = '비밀번호 확인이 일치하지 않아요. 똑같이 다시 입력해 주세요.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = '이메일 형식이 맞지 않아요. name@example.com처럼 입력해 주세요.'; shakeEl(err); $('#aEmail').focus(); return; }
+    if (pw.length < 8) { err.textContent = '비밀번호가 너무 짧아요. 8자 이상으로 입력해 주세요.'; shakeEl(err); $('#aPw').focus(); return; }
+    if (up && pw !== $('#aPw2').value) { err.textContent = '비밀번호 확인이 일치하지 않아요. 똑같이 다시 입력해 주세요.'; shakeEl(err); $('#aPw2').focus(); return; }
     const btn = $('#aSubmit'); err.textContent = '';
     await withLock(btn, up ? '가입하는 중…' : '로그인하는 중…', async () => {
       try {
@@ -1374,7 +1474,7 @@ function renderAuthForm(kind) {
         await enterSession(user);
         if (S.profiles[App.me]) leaveAuth(`${profileOf(App.me).nickname}님, 반가워요!`);
         else { OB.step = 0; renderOnboard(); }
-      } catch (ex) { err.textContent = krError(ex); }
+      } catch (ex) { err.textContent = krError(ex); shakeEl(err); }
     });
   });
 }
@@ -1393,13 +1493,13 @@ function renderResetRequest() {
   $('#resetForm').addEventListener('submit', async e => {
     e.preventDefault();
     const email = $('#rEmail').value.trim(), err = $('#rErr');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = '이메일 형식이 맞지 않아요. 다시 확인해 주세요.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = '이메일 형식이 맞지 않아요. 다시 확인해 주세요.'; shakeEl(err); return; }
     err.textContent = '';
     await withLock($('#rSubmit'), '보내는 중…', async () => {
       try {
         if (!App.demo) await q(sb.auth.resetPasswordForEmail(email, {redirectTo:location.origin + location.pathname}));
         $('#resetForm').innerHTML = `<div class="note contrast" style="margin:0">${I.info}<span><b>${esc(email)}</b>로 재설정 메일을 보냈어요. 메일 안의 링크를 누르면 새 비밀번호를 설정할 수 있어요.</span></div><button type="button" class="btn btn-gray btn-block" style="margin-top:16px" data-act="login">로그인 화면으로</button>`;
-      } catch (ex) { err.textContent = krError(ex); }
+      } catch (ex) { err.textContent = krError(ex); shakeEl(err); }
     });
   });
 }
@@ -1410,16 +1510,18 @@ function renderNewPassword() {
   $('#fab').classList.add('hidden'); $('#tabbar').classList.add('hidden'); $('#sidebar').classList.add('hidden');
   a.innerHTML = `<div class="ob-step" style="flex:1;padding-top:24px"><h2>새 비밀번호를<br>설정해 주세요</h2><p class="lead">앞으로 로그인할 때 쓸 8자 이상의 비밀번호를 입력해 주세요.</p>
     <form id="newPwForm" novalidate>
-      <div class="field"><label for="np1">새 비밀번호 <small>8자 이상</small></label><input class="input" id="np1" type="password" autocomplete="new-password"></div>
-      <div class="field"><label for="np2">새 비밀번호 확인</label><input class="input" id="np2" type="password" autocomplete="new-password"></div>
+      <div class="field"><label for="np1">새 비밀번호 <small>8자 이상</small></label><div class="input-wrap pw-wrap"><input class="input" id="np1" type="password" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-for="np1" aria-label="새 비밀번호 보기" aria-pressed="false">${I.eye}</button></div>${pwMeterHtml('np1')}</div>
+      <div class="field"><label for="np2">새 비밀번호 확인</label><div class="input-wrap pw-wrap"><input class="input" id="np2" type="password" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-for="np2" aria-label="새 비밀번호 확인 보기" aria-pressed="false">${I.eye}</button></div><div class="pw-match" id="np1Match" aria-live="polite"></div></div>
       <div class="hint err" id="npErr" role="alert"></div>
       <button class="btn btn-primary btn-block" type="submit" id="npSubmit">비밀번호 저장하기</button>
     </form></div>`;
+  bindPwToggles(a);
+  bindPasswordSecurity(a, '#np1', '#np2', 'np1');
   $('#newPwForm').addEventListener('submit', async e => {
     e.preventDefault();
     const p1 = $('#np1').value, p2 = $('#np2').value, err = $('#npErr');
-    if (p1.length < 8) { err.textContent = '비밀번호가 너무 짧아요. 8자 이상으로 입력해 주세요.'; return; }
-    if (p1 !== p2) { err.textContent = '새 비밀번호가 서로 달라요. 똑같이 다시 입력해 주세요.'; return; }
+    if (p1.length < 8) { err.textContent = '비밀번호가 너무 짧아요. 8자 이상으로 입력해 주세요.'; shakeEl(err); return; }
+    if (p1 !== p2) { err.textContent = '새 비밀번호가 서로 달라요. 똑같이 다시 입력해 주세요.'; shakeEl(err); return; }
     err.textContent = '';
     await withLock($('#npSubmit'), '저장하는 중…', async () => {
       try {
@@ -1431,7 +1533,7 @@ function renderNewPassword() {
           if (data && data.session) await enterSession(data.session.user);
         }
         leaveAuth('새 비밀번호로 바꿨어요!');
-      } catch (ex) { err.textContent = krError(ex); }
+      } catch (ex) { err.textContent = krError(ex); shakeEl(err); }
     });
   });
 }

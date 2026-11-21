@@ -12,7 +12,8 @@ export default defineConfig(() => {
       {
         name: 'inject-preview-env',
         transformIndexHtml(html: string): string {
-          const sbUrl = (process.env.SUPABASE_URL || '').trim();
+          let sbUrl = (process.env.SUPABASE_URL || '').trim();
+          try { if (sbUrl) sbUrl = new URL(sbUrl).origin; } catch {}
           const sbKey = (process.env.SUPABASE_ANON_KEY || '').trim();
           if (sbUrl) html = html.split('{{SUPABASE_URL}}').join(sbUrl);
           if (sbKey) html = html.split('{{SUPABASE_ANON_KEY}}').join(sbKey);
