@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F6F3EF">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>바꿀래</title>
+<link rel="stylesheet" href="./style.css">
+<!-- 배포할 때 GitHub Actions가 {{ }} 자리를 Secrets 값으로 바꿔 넣어요. 저장소에는 실제 값이 없어요. -->
+<script>window.APP_CONFIG = {supabaseUrl: "{{SUPABASE_URL}}", supabaseAnonKey: "{{SUPABASE_ANON_KEY}}"};</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
+<!-- 카카오맵 JavaScript SDK: 지도는 방문자 브라우저에서 그려져요 -->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{KAKAO_JS_KEY}}&libraries=services&autoload=false"></script>
+<script src="./geo.js"></script>
+</head>
+<body>
+<div id="app">
+  <div id="main"></div>
+  <div id="pages"></div>
+  <button class="fab hidden" id="fab" data-act="newItem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>물건 등록</button>
+  <nav class="tabbar hidden" id="tabbar" aria-label="메뉴">
+    <button class="tab on" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.8l8.5 6.7V19a1.6 1.6 0 0 1-1.6 1.6h-3.6v-6h-6.6v6H5.1A1.6 1.6 0 0 1 3.5 19z"/></svg>홈</button>
+    <button class="tab" data-tab="challenge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 7.5 8.3 14.7a2 2 0 0 0 2.8 2.8l7.6-7.6a4 4 0 0 0-5.6-5.6L5.4 12a6 6 0 0 0 8.5 8.5l6.4-6.4"/></svg>챌린지</button>
+    <button class="tab" data-tab="offers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>제안함</button>
+    <button class="tab" data-tab="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20.5c1.4-3.6 4.4-5.5 8-5.5s6.6 1.9 8 5.5"/></svg>마이</button>
+  </nav>
+  <div class="loading" id="loading"><div class="spinner" role="progressbar" aria-label="불러오는 중"></div></div>
+</div>
+<script src="./app.js"></script>
+</body>
+</html>

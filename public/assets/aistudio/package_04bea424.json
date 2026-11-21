@@ -1,0 +1,11 @@
+{
+  "name": "baggullae",
+  "version": "2.0.0",
+  "private": true,
+  "description": "바꿀래 — GitHub Pages + Supabase + 카카오맵 물물교환 웹앱",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --serve"
+  },
+  "engines": { "node": ">=18" }
+}
