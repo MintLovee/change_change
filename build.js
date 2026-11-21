@@ -70,11 +70,15 @@ for (const f of fs.readdirSync(src)) {
   }
   fs.writeFileSync(path.join(dist, f), txt);
 }
+const assetsSrc = path.join(src, 'assets');
+if (fs.existsSync(assetsSrc)) {
+  fs.cpSync(assetsSrc, path.join(dist, 'assets'), {recursive:true, force:true});
+}
 fs.writeFileSync(path.join(dist, '.nojekyll'), '');
 console.log('[바꿀래] dist/ 를 만들었어요.');
 
 if (process.argv.includes('--serve')) {
-  const types = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8'};
+  const types = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.png':'image/png', '.webp':'image/webp', '.svg':'image/svg+xml'};
   const port = Number(process.env.PORT) || 3000;
   http.createServer((req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);

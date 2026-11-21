@@ -103,8 +103,13 @@ const dateKorean = ts => { const d = new Date(ts); return `${d.getFullYear()}년
 const AV_COLORS = ['#E8762E','#23406D','#238556','#B0567A','#7A5BC4','#B57A14','#2E7D9B','#8C6A4F'];
 function avatarColor(id) { let h = 0; for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return AV_COLORS[h % AV_COLORS.length]; }
 function avatar(id, size = '') { const p = profileOf(id); const ch = (p.nickname || '?').trim().charAt(0); return `<span class="avatar ${size}" style="background:${avatarColor(id)}" aria-hidden="true">${esc(ch)}</span>`; }
+const IS_VITE_DEV = !!(typeof document !== 'undefined' && document.querySelector('script[src="/src/app.js"]'));
+function assetUrl(u) {
+  const s = String(u || '');
+  return IS_VITE_DEV && s.startsWith('./assets/') ? '/src/' + s.slice(2) : s;
+}
 function phBox(cat) { const p = parentOf(cat); const bg = p === 1 ? 'var(--contrast-soft)' : p === 2 ? 'var(--accent-soft)' : 'var(--surface-2)'; const fg = p === 1 ? 'var(--contrast-text)' : p === 2 ? 'var(--accent-text)' : 'var(--muted)'; return `<div class="ph" style="background:${bg};color:${fg}">${I['cat' + (p || 3)]}</div>`; }
-function itemImg(item) { return item && item.photos && item.photos[0] ? `<img src="${esc(item.photos[0])}" alt="${esc(item.title || '물건 사진')}" loading="lazy">` : phBox(item ? item.cat : 3); }
+function itemImg(item) { return item && item.photos && item.photos[0] ? `<img src="${esc(assetUrl(item.photos[0]))}" alt="${esc(item.title || '물건 사진')}" loading="lazy" referrerpolicy="no-referrer">` : phBox(item ? item.cat : 3); }
 function haversine(a, b, c, d) { return LOC.haversineMeters ? LOC.haversineMeters(a, b, c, d) : 0; }
 function guAt(lat, lng) { return LOC.guAt ? LOC.guAt(lat, lng, GEO) : null; }
 function formatDist(m) { return LOC.formatDistance ? LOC.formatDistance(m) : ''; }
@@ -444,11 +449,11 @@ function initDemoData() {
     'ex-hana': {nickname:'하나둘클립', region:'성동구', dong:'성수동2가', loc:{lat:37.544, lng:127.058}, wants:[{t:'cat', c:3}], example:false, tradeCount:2, createdAt:t - 1555200000}
   };
   S.items = {
-    'demo-my1': {owner:'demo-me', title:'미개봉 립 틴트 로즈 컬러', cat:22, cond:'sealed', value:18000, pref:'any', methods:['meet','door'], meet:{lat:37.5572, lng:126.9245, name:'홍대입구역 근처'}, photos:[], desc:'선물 받아 보관만 했어요.', region:'마포구', status:'available', createdAt:t - 3600000, challengeId:null},
-    'ex-i1': {owner:'ex-pocamo', title:'아이브 안유진 일레븐 포카 (미공포)', cat:11, cond:'used', value:8000, pref:'any', methods:['parcel','door'], meet:null, photos:[], desc:'슬리브 보관만 했어요. 메이크업 제품이랑 바꾸고 싶어요.', region:'마포구', status:'available', createdAt:t - 10800000, challengeId:null},
-    'ex-i2': {owner:'ex-sora', title:'미개봉 쿠션 팩트 21호', cat:22, cond:'sealed', value:32000, pref:'equal', methods:['meet'], meet:{lat:37.5572, lng:126.9245, name:'홍대입구역 근처'}, photos:[], desc:'선물 받았는데 색이 안 맞아요. 포카 교환 원해요!', region:'마포구', status:'available', createdAt:t - 18000000, challengeId:null},
-    'ex-i3': {owner:'ex-jun', title:'디퓨저 200ml 새상품 (우드 향)', cat:33, cond:'new', value:0, pref:'any', methods:[], meet:null, photos:[], desc:'', region:'성동구', status:'available', createdAt:t - 32400000, challengeId:null},
-    'ex-i6': {owner:'ex-hana', title:'무드등 (원목 받침)', cat:33, cond:'used', value:15000, pref:'any', methods:['meet'], meet:{lat:37.5446, lng:127.0559, name:'성수역 근처'}, photos:[], desc:'빨간 클립 챌린지 3단계 물건이에요. 더 큰 물건으로 바꿔 주세요!', region:'성동구', status:'available', createdAt:t - 72000000, challengeId:'ex-c1'}
+    'demo-my1': {owner:'demo-me', title:'미개봉 립 틴트 로즈 컬러', cat:22, cond:'sealed', value:18000, pref:'any', methods:['meet','door'], meet:{lat:37.5572, lng:126.9245, name:'홍대입구역 근처'}, photos:['./assets/images/beauty_cushion_tint_1795281152556.jpg'], desc:'선물 받아 보관만 했어요.', region:'마포구', status:'available', createdAt:t - 3600000, challengeId:null},
+    'ex-i1': {owner:'ex-pocamo', title:'아이브 안유진 일레븐 포카 (미공포)', cat:11, cond:'used', value:8000, pref:'any', methods:['parcel','door'], meet:null, photos:['./assets/images/kpop_photocard_sleeve_1795281152320.jpg'], desc:'슬리브 보관만 했어요. 메이크업 제품이랑 바꾸고 싶어요.', region:'마포구', status:'available', createdAt:t - 10800000, challengeId:null},
+    'ex-i2': {owner:'ex-sora', title:'미개봉 쿠션 팩트 21호', cat:22, cond:'sealed', value:32000, pref:'equal', methods:['meet'], meet:{lat:37.5572, lng:126.9245, name:'홍대입구역 근처'}, photos:['./assets/images/beauty_cushion_tint_1795281152556.jpg'], desc:'선물 받았는데 색이 안 맞아요. 포카 교환 원해요!', region:'마포구', status:'available', createdAt:t - 18000000, challengeId:null},
+    'ex-i3': {owner:'ex-jun', title:'디퓨저 200ml 새상품 (우드 향)', cat:33, cond:'new', value:0, pref:'any', methods:[], meet:null, photos:['./assets/images/reed_diffuser_interior_1795281152902.jpg'], desc:'', region:'성동구', status:'available', createdAt:t - 32400000, challengeId:null},
+    'ex-i6': {owner:'ex-hana', title:'무드등 (원목 받침)', cat:33, cond:'used', value:15000, pref:'any', methods:['meet'], meet:{lat:37.5446, lng:127.0559, name:'성수역 근처'}, photos:['./assets/images/wood_mood_lamp_1795281152852.jpg'], desc:'빨간 클립 챌린지 3단계 물건이에요. 더 큰 물건으로 바꿔 주세요!', region:'성동구', status:'available', createdAt:t - 72000000, challengeId:'ex-c1'}
   };
   S.offers = {
     'demo-o1': {from:'ex-pocamo', to:'demo-me', target:'demo-my1', offered:'ex-i1', message:'마포구에서 직거래 가능해요!', method:'meet', meet:{lat:37.5572, lng:126.9245, name:'홍대입구역 근처'}, status:'accepted', fromDone:false, toDone:false, acceptedAt:t - 3500000, createdAt:t - 4000000, updatedAt:t - 3500000},
@@ -462,9 +467,9 @@ function initDemoData() {
   };
   S.challenges = {
     'ex-c1': {owner:'ex-hana', title:'볼펜 한 자루로 에어팟까지', goal:'에어팟', status:'active', cheers:['ex-sora','ex-jun','ex-pocamo'], currentItemId:'ex-i6', awaitingNext:false, createdAt:t - 777600000, steps:[
-      {title:'모나미 볼펜 한 자루', cat:32, img:null, from:'ex-hana', at:t - 777600000},
-      {title:'핸드크림 미니 3종', cat:24, img:null, from:'ex-sora', note:'볼펜이 핸드크림이 됐어요', at:t - 518400000},
-      {title:'무드등 (원목 받침)', cat:33, img:null, from:'ex-jun', at:t - 172800000}
+      {title:'만년필 & 모눈노트 세트', cat:32, img:'./assets/images/wireless_earbuds_stationery_1795281152251.jpg', from:'ex-hana', at:t - 777600000},
+      {title:'핸드크림 & 세럼 세트', cat:24, img:'./assets/images/skincare_handcream_set_1795281152407.jpg', from:'ex-sora', note:'문구 세트가 핸드크림이 됐어요', at:t - 518400000},
+      {title:'무드등 (원목 받침)', cat:33, img:'./assets/images/wood_mood_lamp_1795281152852.jpg', from:'ex-jun', at:t - 172800000}
     ]}
   };
   S.reviews = {
@@ -853,7 +858,7 @@ function viewHome() {
 }
 
 /* ---- 챌린지 탭 ---- */
-function stepImg(s) { return s && s.img ? `<img src="${esc(s.img)}" alt="">` : phBox(s ? s.cat : 3); }
+function stepImg(s) { return s && s.img ? `<img src="${esc(assetUrl(s.img))}" alt="" referrerpolicy="no-referrer">` : phBox(s ? s.cat : 3); }
 function viewChallenges() {
   const mine = myActiveChallenge();
   let h = navBar('빨간 클립 챌린지') + '<div class="large-title">빨간 클립 챌린지</div>';
@@ -1078,7 +1083,7 @@ function pageItem(id) {
   const photos = it.photos && it.photos.length ? it.photos : null;
   const fav = isFavorite(id);
   let h = `<div class="view no-tab">${navBar(it.title, {back:true, right: mine ? `<button class="nav-btn" data-act="itemMenu" data-id="${id}" aria-label="물건 관리 메뉴">${I.more}</button>` : `<button class="nav-btn" data-act="reportUser" data-id="${it.owner}" aria-label="사용자 신고">${I.flag}</button>`})}`;
-  h += `<div class="gallery">${photos ? `<div class="gallery-track">${photos.map((s, i) => `<img src="${esc(s)}" alt="${esc(it.title)} 사진 ${i + 1}" data-act="viewPhoto" data-id="${id}" data-idx="${i}">`).join('')}</div>` : `<div class="gallery-track">${phBox(it.cat)}</div>`}${photos && photos.length > 1 ? `<div class="dots">${photos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}</div>`;
+  h += `<div class="gallery">${photos ? `<div class="gallery-track">${photos.map((s, i) => `<img src="${esc(assetUrl(s))}" alt="${esc(it.title)} 사진 ${i + 1}" data-act="viewPhoto" data-id="${id}" data-idx="${i}" referrerpolicy="no-referrer">`).join('')}</div>` : `<div class="gallery-track">${phBox(it.cat)}</div>`}${photos && photos.length > 1 ? `<div class="dots">${photos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}</div>`;
   h += `<button class="seller" data-act="openUser" data-id="${it.owner}">${avatar(it.owner)}<div><div class="sn">${esc(p.nickname)}${isExample(it.owner) ? ' <span class="tag">예시</span>' : ''}</div><div class="sr">${esc(LOC.userRegionLabel ? LOC.userRegionLabel(p) : p.region)}${!mine && itemDistStr(it) ? ' · ' + esc(itemDistStr(it)) : ''}</div></div><div class="temp"><div class="tv num" style="color:${tempColor(t)}">${t.toFixed(1)}°C</div><div class="tb"><i style="width:${Math.min(100, t)}%;background:${tempColor(t)}"></i></div><div class="tl">교환온도</div></div></button>`;
   h += `<div class="detail">`;
   if (ch) h += `<button class="note" style="margin:0 0 14px;width:100%;text-align:left" data-act="openChallenge" data-id="${it.challengeId}">${I.clip}<span>빨간 클립 챌린지 <b>${ch.steps.length}단계</b> 물건이에요. “${esc(ch.title)}” 타임라인 보기</span></button>`;
@@ -1141,7 +1146,7 @@ function renderChatPage(el, p, first) {
       const tail = !next || next.sender !== m.sender || dateDayKey(next.at) !== day || (next.at - m.at) >= 120000;
       const anim = !first && !prevIds.has(m.id);
       prevIds.add(m.id);
-      out += `<div class="msg-row ${isMe ? 'me' : ''} ${grouped ? 'grouped' : ''} ${tail ? 'tail' : ''} ${anim ? 'anim' : ''}"><div class="msg-bubble ${m.photo ? 'has-photo' : ''}">${m.photo ? `<img class="msg-photo" src="${esc(m.photo)}" alt="채팅 사진" data-act="viewChatPhoto" data-src="${esc(m.photo)}">` : ''}${m.text ? `<div class="msg-text">${esc(m.text)}</div>` : ''}</div>${tail ? `<div class="msg-meta">${isMe && m.readAt ? '<span class="msg-read">읽음</span>' : ''}<span>${timeStr(m.at)}</span></div>` : ''}</div>`;
+      out += `<div class="msg-row ${isMe ? 'me' : ''} ${grouped ? 'grouped' : ''} ${tail ? 'tail' : ''} ${anim ? 'anim' : ''}"><div class="msg-bubble ${m.photo ? 'has-photo' : ''}">${m.photo ? `<img class="msg-photo" src="${esc(assetUrl(m.photo))}" alt="채팅 사진" data-act="viewChatPhoto" data-src="${esc(m.photo)}" referrerpolicy="no-referrer">` : ''}${m.text ? `<div class="msg-text">${esc(m.text)}</div>` : ''}</div>${tail ? `<div class="msg-meta">${isMe && m.readAt ? '<span class="msg-read">읽음</span>' : ''}<span>${timeStr(m.at)}</span></div>` : ''}</div>`;
     }
     return out;
   };
@@ -1283,7 +1288,7 @@ function openPhotoViewer(photos, startIdx = 0) {
   const v = document.createElement('div');
   v.className = 'viewer'; v.setAttribute('role', 'dialog'); v.setAttribute('aria-label', '사진 확대 보기');
   v.innerHTML = `<div class="viewer-top"><span class="viewer-count num" id="vCount">${startIdx + 1} / ${photos.length}</span><button class="viewer-close" id="vClose" aria-label="사진 닫기">${I.close}</button></div>
-    <div class="viewer-track" id="vTrack">${photos.map((src, i) => `<div class="viewer-slide"><img src="${esc(src)}" alt="사진 ${i + 1}"></div>`).join('')}</div>
+    <div class="viewer-track" id="vTrack">${photos.map((src, i) => `<div class="viewer-slide"><img src="${esc(assetUrl(src))}" alt="사진 ${i + 1}" referrerpolicy="no-referrer"></div>`).join('')}</div>
     ${photos.length > 1 ? `<div class="viewer-dots" id="vDots">${photos.map((_, i) => `<i class="${i === startIdx ? 'on' : ''}"></i>`).join('')}</div>` : ''}`;
   document.body.appendChild(v);
   requestAnimationFrame(() => v.classList.add('in'));
@@ -1622,10 +1627,27 @@ function renderAuthForm(kind) {
       <div class="hint err" id="aErr" role="alert"></div>
       <button class="btn btn-primary btn-block" type="submit" id="aSubmit" style="margin-top:14px">${up ? '가입하고 프로필 만들기' : '로그인'}</button>
     </form>
+    ${!up ? `<div class="demo-quick">
+      <div class="demo-quick-head"><span>시연용 데모 계정 빠른 로그인</span><small>seed.sql 실행 후 이용</small></div>
+      <div class="demo-quick-grid">
+        <button type="button" class="demo-quick-btn" data-demo-email="demo1@baggullae.kr" data-demo-pw="Baggullae1!"><span><b>민트귤 · 마포구 서교동</b><small>받은·보낸 제안, 진행 중 채팅, 완료·후기 전체 체험</small></span><span class="demo-quick-badge">메인</span></button>
+        <button type="button" class="demo-quick-btn" data-demo-email="demo2@baggullae.kr" data-demo-pw="Baggullae1!"><span><b>포카모아 · 마포구 합정동</b><small>민트귤과 2인 실시간 채팅 · 제안 수락 테스트</small></span><span class="demo-quick-badge">2인용</span></button>
+        <button type="button" class="demo-quick-btn" data-demo-email="demo3@baggullae.kr" data-demo-pw="Baggullae1!"><span><b>새싹클립 · 강남구 역삼동</b><small>완주 챌린지 공유카드 · 나눔 물건 체험</small></span><span class="demo-quick-badge">챌린지</span></button>
+      </div>
+    </div>` : ''}
     ${!up ? '<button class="btn btn-ghost btn-block" data-act="forgotPw" style="margin-top:6px">비밀번호를 잊었어요</button>' : ''}
     <button class="btn btn-ghost btn-block" data-act="${up ? 'login' : 'signup'}" style="margin-top:4px">${up ? '이미 가입했어요 · 로그인' : '처음이에요 · 회원가입'}</button></div>`;
   bindPwToggles(a);
   if (up) bindPasswordSecurity(a, '#aPw', '#aPw2', 'aPw');
+  else {
+    $$('[data-demo-email]', a).forEach(btn => {
+      btn.addEventListener('click', () => {
+        $('#aEmail', a).value = btn.dataset.demoEmail;
+        $('#aPw', a).value = btn.dataset.demoPw;
+        $('#authForm', a).requestSubmit();
+      });
+    });
+  }
   setTimeout(() => { const el = $('#aEmail'); el && el.focus(); }, 300);
   $('#authForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1636,7 +1658,7 @@ function renderAuthForm(kind) {
     const btn = $('#aSubmit'); err.textContent = '';
     await withLock(btn, up ? '가입하는 중…' : '로그인하는 중…', async () => {
       try {
-        if (App.demo) { leaveAuth('로그인했어요!'); return; }
+        if (App.demo) { if (!App.session) initDemoData(); leaveAuth('로그인했어요!'); return; }
         let user;
         if (up) {
           const data = await q(sb.auth.signUp({email, password:pw, options:{emailRedirectTo:location.origin + location.pathname}}));
@@ -2044,7 +2066,7 @@ function openItemForm(item, opts = {}) {
         });
       }
       const drawPhotos = () => {
-        $('#fPhotos', sh).innerHTML = (f.photos.length < 4 ? `<button type="button" class="photo-add" id="fAdd" aria-label="사진 추가">${I.camera}<span>${f.photos.length}/4</span></button>` : '') + f.photos.map((p, i) => `<div class="photo"><img src="${esc(p.url)}" alt="사진 ${i + 1}"><button type="button" data-rm="${i}" aria-label="사진 ${i + 1} 삭제">${I.close}</button>${i === 0 ? '<span class="cover">대표</span>' : ''}</div>`).join('');
+        $('#fPhotos', sh).innerHTML = (f.photos.length < 4 ? `<button type="button" class="photo-add" id="fAdd" aria-label="사진 추가">${I.camera}<span>${f.photos.length}/4</span></button>` : '') + f.photos.map((p, i) => `<div class="photo"><img src="${esc(assetUrl(p.url))}" alt="사진 ${i + 1}" referrerpolicy="no-referrer"><button type="button" data-rm="${i}" aria-label="사진 ${i + 1} 삭제">${I.close}</button>${i === 0 ? '<span class="cover">대표</span>' : ''}</div>`).join('');
         $('#pCount', sh).textContent = f.photos.length;
       };
       drawPhotos();
@@ -2916,7 +2938,7 @@ async function openShareCard(cid) {
     const idx = steps.indexOf(s);
     g.fillStyle = v('--surface'); g.beginPath(); g.roundRect(60, y, W - 120, 180, 36); g.fill();
     g.save(); g.beginPath(); g.roundRect(90, y + 25, 130, 130, 24); g.clip();
-    if (s.img) { try { const im = await loadImage(s.img); const r = Math.max(130 / im.width, 130 / im.height); g.drawImage(im, 90 + (130 - im.width * r) / 2, y + 25 + (130 - im.height * r) / 2, im.width * r, im.height * r); } catch (e) {} }
+    if (s.img) { try { const im = await loadImage(assetUrl(s.img)); const r = Math.max(130 / im.width, 130 / im.height); g.drawImage(im, 90 + (130 - im.width * r) / 2, y + 25 + (130 - im.height * r) / 2, im.width * r, im.height * r); } catch (e) {} }
     else { g.fillStyle = v('--surface-2'); g.fillRect(90, y + 25, 130, 130); }
     g.restore();
     g.fillStyle = idx === 0 ? v('--contrast') : acc; g.beginPath(); g.arc(W - 150, y + 90, 40, 0, Math.PI * 2); g.fill();
