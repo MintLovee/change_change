@@ -219,8 +219,15 @@ function krError(e) {
   if (/Password should be/i.test(m)) return '비밀번호가 너무 짧아요. 8자 이상으로 입력해 주세요.';
   if (/same password/i.test(m)) return '지금 쓰고 있는 비밀번호와 같아요. 다른 비밀번호를 입력해 주세요.';
   if (/rate limit|too many/i.test(m)) return '요청을 너무 자주 보냈어요. 1분 정도 기다린 뒤 다시 시도해 주세요.';
-  if (e && e.code === '23505') return '이미 다른 사람이 쓰고 있는 닉네임이에요. 다른 이름을 입력해 주세요.';
-  if (e && (e.code === '42501' || e.code === 'NO_ROWS')) return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
+  if (e && e.code === '23505') {
+    if (/nickname/i.test(m) || /nickname/i.test((e && e.details) || '')) return '이미 다른 사람이 쓰고 있는 닉네임이에요. 다른 이름을 입력해 주세요.';
+    return '이미 저장된 정보예요. 새로고침한 뒤 다시 확인해 주세요.';
+  }
+  if (e && e.code === '42501') {
+    if (/permission denied for table/i.test(m)) return '데이터베이스 테이블 권한이 설정되지 않았어요. Supabase SQL Editor에서 schema.sql을 다시 실행해 주세요.';
+    return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
+  }
+  if (e && e.code === 'NO_ROWS') return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return '인터넷 연결이 불안정해 저장하지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.';
   if (/[가-힣]/.test(m)) return m;
   return '작업을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.';
@@ -271,6 +278,7 @@ const Store = {
 };
 
 function handleWriteError(e) {
+  console.error('[바꿀래 저장 오류]', e);
   if (e && (e.status === 401 || /JWT expired/i.test(e.message || ''))) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.'); signOutLocal(); return; }
   toast(krError(e));
 }
@@ -1436,7 +1444,7 @@ function renderAuthForm(kind) {
   a.dataset.mode = 'form';
   const up = kind === 'signup';
   a.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:22px"><button class="nav-btn" data-act="authBack" aria-label="뒤로">${I.back}</button></div>
-    <div class="ob-step" style="flex:1"><h2>${up ? '이메일로<br>가입하기' : '다시 만나서<br>반가워요'}</h2><p class="lead">${up ? '로그인할 때 쓸 이메일과 비밀번호를 정해 주세요.' : '가입한 이메일과 비밀번호를 입력해 주세요.'}</p>
+    <div class="ob-step anim" style="flex:1"><h2>${up ? '이메일로<br>가입하기' : '다시 만나서<br>반가워요'}</h2><p class="lead">${up ? '로그인할 때 쓸 이메일과 비밀번호를 정해 주세요.' : '가입한 이메일과 비밀번호를 입력해 주세요.'}</p>
     <form id="authForm" novalidate>
       <div class="field"><label for="aEmail">이메일</label><input class="input" id="aEmail" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com"></div>
       <div class="field"><label for="aPw">비밀번호${up ? ' <small>8자 이상</small>' : ''}</label><div class="input-wrap pw-wrap"><input class="input" id="aPw" type="password" autocomplete="${up ? 'new-password' : 'current-password'}"><button type="button" class="pw-eye" data-pw-for="aPw" aria-label="비밀번호 보기" aria-pressed="false">${I.eye}</button></div>${up ? pwMeterHtml('aPw') : ''}</div>
@@ -1483,7 +1491,7 @@ function renderResetRequest() {
   let a = $('#auth'); if (!a) { renderAuth(); a = $('#auth'); }
   a.dataset.mode = 'reset';
   a.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:22px"><button class="nav-btn" data-act="login" aria-label="로그인으로 돌아가기">${I.back}</button></div>
-    <div class="ob-step" style="flex:1"><h2>비밀번호 재설정<br>메일 보내기</h2><p class="lead">가입한 이메일 주소를 입력하면 새 비밀번호를 정할 수 있는 링크를 보내드려요.</p>
+    <div class="ob-step anim" style="flex:1"><h2>비밀번호 재설정<br>메일 보내기</h2><p class="lead">가입한 이메일 주소를 입력하면 새 비밀번호를 정할 수 있는 링크를 보내드려요.</p>
     <form id="resetForm" novalidate>
       <div class="field"><label for="rEmail">이메일</label><input class="input" id="rEmail" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com"></div>
       <div class="hint err" id="rErr" role="alert"></div>
@@ -1508,7 +1516,7 @@ function renderNewPassword() {
   let a = $('#auth'); if (!a) { a = document.createElement('div'); a.id = 'auth'; a.className = 'auth'; $('#stage').appendChild(a); }
   a.dataset.mode = 'reset';
   $('#fab').classList.add('hidden'); $('#tabbar').classList.add('hidden'); $('#sidebar').classList.add('hidden');
-  a.innerHTML = `<div class="ob-step" style="flex:1;padding-top:24px"><h2>새 비밀번호를<br>설정해 주세요</h2><p class="lead">앞으로 로그인할 때 쓸 8자 이상의 비밀번호를 입력해 주세요.</p>
+  a.innerHTML = `<div class="ob-step anim" style="flex:1;padding-top:24px"><h2>새 비밀번호를<br>설정해 주세요</h2><p class="lead">앞으로 로그인할 때 쓸 8자 이상의 비밀번호를 입력해 주세요.</p>
     <form id="newPwForm" novalidate>
       <div class="field"><label for="np1">새 비밀번호 <small>8자 이상</small></label><div class="input-wrap pw-wrap"><input class="input" id="np1" type="password" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-for="np1" aria-label="새 비밀번호 보기" aria-pressed="false">${I.eye}</button></div>${pwMeterHtml('np1')}</div>
       <div class="field"><label for="np2">새 비밀번호 확인</label><div class="input-wrap pw-wrap"><input class="input" id="np2" type="password" autocomplete="new-password"><button type="button" class="pw-eye" data-pw-for="np2" aria-label="새 비밀번호 확인 보기" aria-pressed="false">${I.eye}</button></div><div class="pw-match" id="np1Match" aria-live="polite"></div></div>
@@ -1546,7 +1554,7 @@ function leaveAuth(msg) {
   setTimeout(() => { a.remove(); render(); if (msg) toast(msg); }, 350);
 }
 
-function renderOnboard() {
+function renderOnboard(animate = true) {
   const a = $('#auth'); a.dataset.mode = 'onboard';
   const s = OB.step;
   let body = '';
@@ -1555,7 +1563,7 @@ function renderOnboard() {
   else if (s === 2) body = `<h2>찾고 있는 물건이<br>있나요?</h2><p class="lead">나중에 등록해도 괜찮아요. 최대 5개까지 고를 수 있어요.</p><div class="chips wrap">${CATS.map(c => c.subs.map(([id, n]) => { const on = OB.wants.some(w => w.c === id); return `<button class="chip ${on ? 'on-accent' : ''}" data-act="obWant" data-v="${id}">${n}</button>`; }).join('')).join('')}</div>`;
   else body = `<h2>마지막으로<br>약속해 주세요</h2><p class="lead">모두가 믿고 교환할 수 있도록 지켜야 할 것들이에요.</p>${[['이용약관 동의 (필수)', '교환은 당사자 간 거래이며 바꿀래는 중개하지 않아요.'], ['개인정보 처리 동의 (필수)', '닉네임·동네·등록 물건만 저장해요. 주소는 저장하지 않아요.'], ['안전 교환 약속 (필수)', '대면은 역·카페 같은 공공장소에서, 현금 거래는 하지 않아요.']].map(([b, t], i) => `<button class="check-row ${OB.agree[i] ? 'on' : ''}" data-act="obAgree" data-i="${i}"><span class="cbox">${I.check}</span><span><b>${b}</b><span>${t}</span></span></button>`).join('')}`;
   const can = s === 0 ? validNick(OB.nickname) === '' : s === 1 ? !!OB.region : s === 2 ? true : OB.agree.every(Boolean);
-  a.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="nav-btn" data-act="obBack" aria-label="뒤로">${I.back}</button></div><div class="steps-dots">${[0, 1, 2, 3].map(i => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div><div class="ob-step" style="flex:1">${body}</div><div class="auth-actions" style="margin-top:20px;animation:none">${s === 2 ? `<button class="btn btn-primary btn-block" data-act="obNext">${OB.wants.length ? OB.wants.length + '개 선택 · 다음' : '건너뛰기'}</button>` : `<button class="btn btn-primary btn-block" data-act="obNext" ${can ? '' : 'disabled'}>${s === 3 ? '가입 완료' : '다음'}</button>`}</div>`;
+  a.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="nav-btn" data-act="obBack" aria-label="뒤로">${I.back}</button></div><div class="steps-dots">${[0, 1, 2, 3].map(i => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div><div class="ob-step ${animate ? 'anim' : ''}" style="flex:1">${body}</div><div class="auth-actions" style="margin-top:20px;animation:none">${s === 2 ? `<button class="btn btn-primary btn-block" data-act="obNext">${OB.wants.length ? OB.wants.length + '개 선택 · 다음' : '건너뛰기'}</button>` : `<button class="btn btn-primary btn-block" data-act="obNext" ${can ? '' : 'disabled'}>${s === 3 ? '가입 완료' : '다음'}</button>`}</div>`;
   if (s === 0) { const inp = $('#obNick'); setTimeout(() => inp.focus(), 300); inp.addEventListener('input', () => { OB.nickname = inp.value; const err = validNick(inp.value); const h = $('#obNickHint'); h.textContent = err || '좋은 닉네임이에요!'; h.classList.toggle('err', !!err && inp.value.length > 0); $('[data-act="obNext"]').disabled = !!err; }); inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !validNick(inp.value)) ACT.obNext(); }); }
 }
 function validNick(v, self) {
@@ -1670,13 +1678,53 @@ const ACT = {
     if (OB.step > 0) { OB.step--; renderOnboard(); return; }
     if (await confirmDialog('가입을 그만둘까요?', '로그아웃되고, 다음에 로그인하면 프로필 만들기부터 이어서 할 수 있어요.', '그만두기', true)) { await signOut(); }
   },
-  obRegion(d) { OB.region = d.v; renderOnboard(); },
-  obWant(d) { const c = +d.v; const i = OB.wants.findIndex(w => w.c === c); if (i >= 0) OB.wants.splice(i, 1); else if (OB.wants.length < 5) OB.wants.push({t:'cat', c}); else toast('최대 5개까지만 고를 수 있어요. 기존 항목을 빼고 다시 골라 주세요.'); renderOnboard(); },
-  obAgree(d) { OB.agree[+d.i] = !OB.agree[+d.i]; renderOnboard(); },
+  obRegion(d, el) {
+    OB.region = d.v;
+    const a = $('#auth');
+    if (a) {
+      $$('[data-act="obRegion"]', a).forEach(b => b.classList.toggle('on-accent', b.dataset.v === OB.region));
+      const next = $('[data-act="obNext"]', a);
+      if (next) next.disabled = !OB.region;
+    } else renderOnboard(false);
+  },
+  obWant(d, el) {
+    const c = +d.v; const i = OB.wants.findIndex(w => w.c === c);
+    if (i >= 0) OB.wants.splice(i, 1);
+    else if (OB.wants.length < 5) OB.wants.push({t:'cat', c});
+    else { toast('최대 5개까지만 고를 수 있어요. 기존 항목을 빼고 다시 골라 주세요.'); return; }
+    const a = $('#auth');
+    if (a && el) {
+      el.classList.toggle('on-accent', i < 0);
+      const next = $('[data-act="obNext"]', a);
+      if (next) next.textContent = OB.wants.length ? OB.wants.length + '개 선택 · 다음' : '건너뛰기';
+    } else renderOnboard(false);
+  },
+  obAgree(d, el) {
+    const idx = +d.i;
+    OB.agree[idx] = !OB.agree[idx];
+    const a = $('#auth');
+    if (a && el) {
+      el.classList.toggle('on', OB.agree[idx]);
+      const next = $('[data-act="obNext"]', a);
+      if (next) next.disabled = !OB.agree.every(Boolean);
+    } else renderOnboard(false);
+  },
   async obNext(d, el) {
-    if (OB.step < 3) { OB.step++; renderOnboard(); return; }
+    if (OB.step < 3) { OB.step++; renderOnboard(true); return; }
     await withLock(el, '가입하는 중…', async () => {
       try {
+        if (!App.demo && sb) {
+          let {data:sd} = await sb.auth.getSession();
+          if (!sd || !sd.session) {
+            const {data:rf} = await sb.auth.refreshSession().catch(() => ({data:null}));
+            sd = rf;
+          }
+          if (!sd || !sd.session || !sd.session.user) {
+            toast('로그인 세션이 확인되지 않아요. 이메일 인증을 완료한 뒤 다시 로그인해 주세요.');
+            return;
+          }
+          App.me = sd.session.user.id;
+        }
         const nick = OB.nickname.trim();
         await Store.set('profiles', App.me, {nickname:nick, region:OB.region, wants:OB.wants, tradeCount:0, createdAt:now(), agreedAt:now()});
         leaveAuth(`${nick}님, 환영해요!`);

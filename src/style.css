@@ -606,12 +606,14 @@ h1,h2,h3{text-wrap:balance;margin:0}
 .steps-dots{display:flex;gap:6px;margin-bottom:22px}
 .steps-dots i{height:4px;flex:1;border-radius:2px;background:var(--surface-2);transition:background .4s}
 .steps-dots i.on{background:var(--accent)}
-.ob-step{animation:slideIn .5s var(--spring) both}
+.ob-step.anim{animation:slideIn .5s var(--spring) both}
 .ob-step h2{font-size:1.6rem;font-weight:800;letter-spacing:-.03em;line-height:1.25;margin-bottom:8px}
 .ob-step p.lead{margin:0 0 24px;font-size:.96rem;color:var(--muted)}
 .region-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
 .region-grid .chip{justify-content:center;padding:10px 6px}
-.check-row{display:flex;gap:12px;align-items:flex-start;min-height:56px;padding:14px;border-radius:var(--r-md);background:var(--surface);text-align:left;width:100%}
+.check-row{display:flex;gap:12px;align-items:flex-start;min-height:56px;padding:14px;border-radius:var(--r-md);background:var(--surface);box-shadow:inset 0 0 0 1px transparent;text-align:left;width:100%;transition:transform .18s var(--spring),background .22s ease,box-shadow .22s ease}
+.check-row:active{transform:scale(.985)}
+.check-row.on{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--accent) 42%,transparent)}
 .check-row + .check-row{margin-top:8px}
 .cbox{flex:none;width:24px;height:24px;border-radius:7px;box-shadow:inset 0 0 0 2px var(--line);display:grid;place-items:center;color:#fff;transition:background .2s,box-shadow .2s}
 .cbox svg{width:15px;height:15px;opacity:0;transform:scale(.4);transition:all .3s var(--bounce)}

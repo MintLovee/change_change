@@ -80,6 +80,11 @@ create table notifications (
 );
 create index notifications_recipient_idx on notifications (recipient);
 
+-- ---------- 기본 스키마·테이블 권한 (RLS와 함께 동작) ----------
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on profiles, items, offers, challenges, reviews, favorites, messages, notifications to authenticated;
+grant insert on reports to authenticated;
+
 -- ---------- 보안 규칙 (Row Level Security) ----------
 alter table profiles enable row level security;
 alter table items enable row level security;

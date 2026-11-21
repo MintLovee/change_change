@@ -120,6 +120,12 @@ describe('바꿀래 핵심 로직 단위 테스트', () => {
 
     const netErr = ctx.krError({ message: 'Failed to fetch' });
     assert.match(netErr, /인터넷 연결/);
+
+    const tableGrantErr = ctx.krError({ code: '42501', message: 'permission denied for table profiles' });
+    assert.match(tableGrantErr, /schema\.sql/);
+
+    const rlsErr = ctx.krError({ code: '42501', message: 'new row violates row-level security policy' });
+    assert.match(rlsErr, /로그인 상태/);
   });
 
   it('채팅방 열림 여부 및 완료/거절 후 7일 읽기 전용 전환을 계산한다', () => {

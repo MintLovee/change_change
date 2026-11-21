@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,15 @@ if (!/^https:\/\/[^"'<>\s]+$/.test(val('SUPABASE_URL')) || /["'<>\s]/.test(val('
 
 const src = path.join(__dirname, 'src'), dist = path.join(__dirname, 'dist');
 const SKIP_FILES = new Set(['App.tsx', 'main.tsx', 'index.css']);
+const hashOf = file => {
+  const p = path.join(src, file);
+  return fs.existsSync(p) ? crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex').slice(0, 8) : '';
+};
+const ASSET_VER = {
+  'style.css': hashOf('style.css'),
+  'geo.js': hashOf('geo.js'),
+  'app.js': hashOf('app.js')
+};
 fs.rmSync(dist, {recursive:true, force:true});
 fs.mkdirSync(dist, {recursive:true});
 for (const f of fs.readdirSync(src)) {
@@ -53,6 +63,9 @@ for (const f of fs.readdirSync(src)) {
   if (f === 'index.html') {
     if (!val('KAKAO_JS_KEY')) txt = txt.replace(/<script[^>]*\{\{KAKAO_JS_KEY\}\}[^>]*><\/script>\s*/, '');
     for (const k of KEYS) txt = txt.split(`{{${k}}}`).join(val(k));
+    for (const [asset, v] of Object.entries(ASSET_VER)) {
+      if (v) txt = txt.split(`./${asset}`).join(`./${asset}?v=${v}`);
+    }
   }
   fs.writeFileSync(path.join(dist, f), txt);
 }
