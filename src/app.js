@@ -1627,14 +1627,6 @@ function renderAuthForm(kind) {
       <div class="hint err" id="aErr" role="alert"></div>
       <button class="btn btn-primary btn-block" type="submit" id="aSubmit" style="margin-top:14px">${up ? '가입하고 프로필 만들기' : '로그인'}</button>
     </form>
-    ${!up ? `<div class="demo-quick">
-      <div class="demo-quick-head"><span>시연용 데모 계정 빠른 로그인</span><small>seed.sql 실행 후 이용</small></div>
-      <div class="demo-quick-grid">
-        <button type="button" class="demo-quick-btn" data-demo-email="demo1@baggullae.kr" data-demo-pw="Baggullae1!"><span><b>민트귤 · 마포구 서교동</b><small>받은·보낸 제안, 진행 중 채팅, 완료·후기 전체 체험</small></span><span class="demo-quick-badge">메인</span></button>
-        <button type="button" class="demo-quick-btn" data-demo-email="demo2@baggullae.kr" data-demo-pw="Baggullae1!"><span><b>포카모아 · 마포구 합정동</b><small>민트귤과 2인 실시간 채팅 · 제안 수락 테스트</small></span><span class="demo-quick-badge">2인용</span></button>
-        <button type="button" class="demo-quick-btn" data-demo-email="demo3@baggullae.kr" data-demo-pw="Baggullae1!"><span><b>새싹클립 · 강남구 역삼동</b><small>완주 챌린지 공유카드 · 나눔 물건 체험</small></span><span class="demo-quick-badge">챌린지</span></button>
-      </div>
-    </div>` : ''}
     ${!up ? '<button class="btn btn-ghost btn-block" data-act="forgotPw" style="margin-top:6px">비밀번호를 잊었어요</button>' : ''}
     <button class="btn btn-ghost btn-block" data-act="${up ? 'login' : 'signup'}" style="margin-top:4px">${up ? '이미 가입했어요 · 로그인' : '처음이에요 · 회원가입'}</button></div>`;
   bindPwToggles(a);
