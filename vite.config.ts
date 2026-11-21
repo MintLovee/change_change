@@ -15,8 +15,14 @@ export default defineConfig(() => {
           let sbUrl = (process.env.SUPABASE_URL || '').trim();
           try { if (sbUrl) sbUrl = new URL(sbUrl).origin; } catch {}
           const sbKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+          const kakaoKey = (process.env.KAKAO_JS_KEY || '').trim();
           if (sbUrl) html = html.split('{{SUPABASE_URL}}').join(sbUrl);
           if (sbKey) html = html.split('{{SUPABASE_ANON_KEY}}').join(sbKey);
+          if (kakaoKey) {
+            html = html.split('{{KAKAO_JS_KEY}}').join(kakaoKey);
+          } else {
+            html = html.replace(/<script[^>]*\{\{KAKAO_JS_KEY\}\}[^>]*><\/script>\s*/g, '');
+          }
           return html;
         },
       },
@@ -39,7 +45,7 @@ export default defineConfig(() => {
           const distSrc = path.resolve(distDir, 'src');
           if (fs.existsSync(distDir)) {
             fs.mkdirSync(distSrc, {recursive: true});
-            for (const file of ['app.js', 'geo.js', 'style.css']) {
+            for (const file of ['app.js', 'geo.js', 'location.js', 'style.css']) {
               const from = path.resolve(__dirname, 'src', file);
               if (fs.existsSync(from)) {
                 fs.copyFileSync(from, path.resolve(distSrc, file));

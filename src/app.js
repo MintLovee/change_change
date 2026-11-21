@@ -73,9 +73,12 @@ const I = {
   cat2:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9.5 3h5v4h-5z"/><path d="M8 7h8l1 3v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-9z"/><path d="M7 13h10"/></svg>',
   cat3:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M9 3.5c0 1.5 1.5 1.5 1.5 3M13 3.5c0 1.5 1.5 1.5 1.5 3"/></svg>',
   eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
-  eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A9.8 9.8 0 0 1 12 5c6 0 9.5 7 9.5 7a16.8 16.8 0 0 1-3.3 4.3M6.6 6.6C4.1 8.4 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.5 0 2.9-.3 4.1-.9"/></svg>'
+  eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A9.8 9.8 0 0 1 12 5c6 0 9.5 7 9.5 7a16.8 16.8 0 0 1-3.3 4.3M6.6 6.6C4.1 8.4 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.5 0 2.9-.3 4.1-.9"/></svg>',
+  gps:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
+  map:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/></svg>'
 };
 const PIN_SVG = '<svg viewBox="0 0 40 48"><path d="M20 46s15-14 15-26A15 15 0 0 0 5 20c0 12 15 26 15 26z" fill="var(--accent)" stroke="#fff" stroke-width="2.5"/><circle cx="20" cy="20" r="5.5" fill="#fff"/></svg>';
+const LOC = window.BaggullaeLoc || {};
 
 /* ============ 유틸 ============ */
 const $ = (s, r = document) => r.querySelector(s);
@@ -102,18 +105,19 @@ function avatarColor(id) { let h = 0; for (const ch of String(id)) h = (h * 31 +
 function avatar(id, size = '') { const p = profileOf(id); const ch = (p.nickname || '?').trim().charAt(0); return `<span class="avatar ${size}" style="background:${avatarColor(id)}" aria-hidden="true">${esc(ch)}</span>`; }
 function phBox(cat) { const p = parentOf(cat); const bg = p === 1 ? 'var(--contrast-soft)' : p === 2 ? 'var(--accent-soft)' : 'var(--surface-2)'; const fg = p === 1 ? 'var(--contrast-text)' : p === 2 ? 'var(--accent-text)' : 'var(--muted)'; return `<div class="ph" style="background:${bg};color:${fg}">${I['cat' + (p || 3)]}</div>`; }
 function itemImg(item) { return item && item.photos && item.photos[0] ? `<img src="${esc(item.photos[0])}" alt="${esc(item.title || '물건 사진')}" loading="lazy">` : phBox(item ? item.cat : 3); }
-function haversine(a, b, c, d) { const R = 6371000, r = Math.PI / 180; const x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
-function pointInRing(lng, lat, ring) { let ins = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) ins = !ins; } return ins; }
-function guAt(lat, lng) {
-  for (const f of GEO.features) {
-    const g = f.geometry; const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
-    for (const p of polys) if (pointInRing(lng, lat, p[0])) return f.properties.n;
-  }
-  return null;
+function haversine(a, b, c, d) { return LOC.haversineMeters ? LOC.haversineMeters(a, b, c, d) : 0; }
+function guAt(lat, lng) { return LOC.guAt ? LOC.guAt(lat, lng, GEO) : null; }
+function formatDist(m) { return LOC.formatDistance ? LOC.formatDistance(m) : ''; }
+function myGeoCoords() { return LOC.userCoords ? LOC.userCoords(profileOf(App.me), CENT) : null; }
+function itemDistStr(it) {
+  const me = myGeoCoords();
+  if (!me || !LOC.itemDistanceMeters) return '';
+  const d = LOC.itemDistanceMeters(it, profileOf(it.owner), me, CENT);
+  return d != null ? formatDist(d) : '';
 }
 function placeName(lat, lng) {
   let best = null, bd = 1e9;
-  for (const [n, a, b] of STATIONS) { const d = haversine(lat, lng, a, b); if (d < bd) { bd = d; best = n; } }
+  for (const [n, a, b] of STATIONS) { const d = haversine(lat, lng, a, b); if (d != null && d < bd) { bd = d; best = n; } }
   if (bd < 450) return best + ' 근처';
   const gu = guAt(lat, lng);
   if (gu) return bd < 1100 ? `${gu} · ${best} 부근` : gu + ' 부근';
@@ -167,20 +171,57 @@ function miniMap(m) {
   return `<div class="kmini" data-lat="${m.lat}" data-lng="${m.lng}"><svg viewBox="${(x - w / 2).toFixed(1)} ${(y - h / 2).toFixed(1)} ${w} ${h}" preserveAspectRatio="xMidYMid slice" aria-label="${esc(m.name)} 지도"><g fill="var(--map-land)" stroke="var(--map-line)" stroke-width=".8">${GEO_PATHS}</g>${labels}${st}<g transform="translate(${x.toFixed(1)} ${(y - 12).toFixed(1)}) scale(.3) translate(-20 -6)"><path d="M20 46s15-14 15-26A15 15 0 0 0 5 20c0 12 15 26 15 26z" fill="var(--accent)" stroke="#fff" stroke-width="3"/><circle cx="20" cy="20" r="5.5" fill="#fff"/></g></svg></div>`;
 }
 
-/* ============ 카카오맵 SDK ============ */
+/* ============ 카카오맵 SDK & 현재 위치 탐색 ============ */
 let KAKAO_READY = false;
+let KAKAO_STATUS = 'init';
 function initKakao() {
-  if (!(window.kakao && window.kakao.maps && typeof window.kakao.maps.load === 'function')) return;
-  try {
-    kakao.maps.load(() => { KAKAO_READY = true; hydrateMiniMaps(document.getElementById('app')); });
-    new MutationObserver(muts => { if (!KAKAO_READY) return; for (const m of muts) m.addedNodes.forEach(n => { if (n.nodeType === 1) hydrateMiniMaps(n); }); }).observe(document.getElementById('app'), {childList:true, subtree:true});
-  } catch (e) { KAKAO_READY = false; }
+  const kScript = document.querySelector && document.querySelector('script[src*="dapi.kakao.com/v2/maps/sdk.js"]');
+  if (!kScript) { KAKAO_STATUS = 'missing_key'; return; }
+  const loadMaps = () => {
+    if (!(window.kakao && window.kakao.maps && typeof window.kakao.maps.load === 'function')) {
+      KAKAO_STATUS = 'sdk_error';
+      return;
+    }
+    try {
+      kakao.maps.load(() => {
+        KAKAO_READY = true;
+        KAKAO_STATUS = 'ready';
+        hydrateMiniMaps(document.getElementById('app'));
+      });
+    } catch (e) { KAKAO_READY = false; KAKAO_STATUS = 'sdk_error'; }
+  };
+  if (!initKakao._obs && document.getElementById('app') && typeof MutationObserver === 'function') {
+    initKakao._obs = true;
+    new MutationObserver(muts => {
+      if (!KAKAO_READY) return;
+      for (const m of muts) m.addedNodes.forEach(n => { if (n.nodeType === 1) hydrateMiniMaps(n); });
+    }).observe(document.getElementById('app'), {childList:true, subtree:true});
+  }
+  if (window.kakao && window.kakao.maps && typeof window.kakao.maps.load === 'function') {
+    loadMaps();
+  } else {
+    KAKAO_STATUS = 'loading';
+    kScript.addEventListener('load', loadMaps, {once:true});
+    kScript.addEventListener('error', () => { KAKAO_READY = false; KAKAO_STATUS = 'sdk_error'; }, {once:true});
+    setTimeout(() => { if (!KAKAO_READY && KAKAO_STATUS === 'loading') KAKAO_STATUS = 'sdk_error'; }, 5000);
+  }
 }
-function hydrateMiniMaps(root) {
+function kakaoStatusNote() {
+  if (KAKAO_READY) return '';
+  if (KAKAO_STATUS === 'missing_key') return '카카오맵 키(KAKAO_JS_KEY)가 설정되지 않아 간이 지도로 보여드려요. GitHub Secrets에 키를 넣으면 실제 카카오맵이 열려요.';
+  if (KAKAO_STATUS === 'sdk_error') return '카카오맵을 불러오지 못해 간이 지도로 보여드려요. 카카오 디벨로퍼스 Web 플랫폼 도메인 등록을 확인해 주세요.';
+  return '';
+}
+function hydrateMiniMaps(root, tries = 0) {
   if (!KAKAO_READY || !root) return;
   const els = root.classList && root.classList.contains('kmini') ? [root] : [...root.querySelectorAll('.kmini')];
   els.forEach(el => {
-    if (el.dataset.k) return; el.dataset.k = '1';
+    if (el.dataset.k) return;
+    if ((!el.offsetWidth || !el.offsetHeight) && tries < 10) {
+      requestAnimationFrame(() => hydrateMiniMaps(el, tries + 1));
+      return;
+    }
+    el.dataset.k = '1';
     const pos = new kakao.maps.LatLng(+el.dataset.lat, +el.dataset.lng);
     el.innerHTML = '';
     try { new kakao.maps.StaticMap(el, {center:pos, level:3, marker:{position:pos}}); } catch (e) {}
@@ -190,6 +231,63 @@ function cssVar(n) { return getComputedStyle(document.documentElement).getProper
 function kakaoPinImage() {
   const svg = PIN_SVG.replace('var(--accent)', cssVar('--accent') || '#E8762E').replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" ');
   return new kakao.maps.MarkerImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), new kakao.maps.Size(40, 48), {offset:new kakao.maps.Point(20, 46)});
+}
+function getGpsPosition() {
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) { rej(new Error('이 브라우저에서는 위치 기능을 쓸 수 없어요. 아래에서 동네를 직접 골라 주세요.')); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => res({lat:pos.coords.latitude, lng:pos.coords.longitude}),
+      err => {
+        if (err && err.code === 1) rej(new Error('위치 권한이 꺼져 있어요. 브라우저 설정에서 위치 접근을 허용하거나 아래에서 동네를 골라 주세요.'));
+        else if (err && err.code === 3) rej(new Error('위치 확인 시간이 지났어요. 잠시 후 다시 시도해 주세요.'));
+        else rej(new Error('현재 위치를 찾지 못했어요. 아래에서 동네를 직접 골라 주세요.'));
+      },
+      {enableHighAccuracy:true, timeout:8000, maximumAge:60000}
+    );
+  });
+}
+async function detectCurrentNeighborhood() {
+  const {lat, lng} = await getGpsPosition();
+  const fallback = () => {
+    const f = LOC.nearestRegionAndStation(lat, lng, CENT, STATIONS, GEO, REGIONS);
+    return {
+      region:f.region,
+      dong:f.dong,
+      fullLabel:f.dong ? `${f.region} · ${f.dong}` : f.region,
+      lat:LOC.roundPublicCoord(lat),
+      lng:LOC.roundPublicCoord(lng),
+      rawLat:lat,
+      rawLng:lng,
+      viaKakao:false
+    };
+  };
+  if (KAKAO_READY && window.kakao && kakao.maps && kakao.maps.services) {
+    return await new Promise(resolve => {
+      try {
+        const geocoder = new kakao.maps.services.Geocoder();
+        geocoder.coord2RegionCode(lng, lat, (results, status) => {
+          if (status === kakao.maps.services.Status.OK) {
+            const parsed = LOC.parseKakaoRegionResult(results, REGIONS);
+            if (parsed) {
+              resolve({
+                region:parsed.region,
+                dong:parsed.dong,
+                fullLabel:parsed.fullLabel,
+                lat:LOC.roundPublicCoord(lat),
+                lng:LOC.roundPublicCoord(lng),
+                rawLat:lat,
+                rawLng:lng,
+                viaKakao:true
+              });
+              return;
+            }
+          }
+          resolve(fallback());
+        });
+      } catch (e) { resolve(fallback()); }
+    });
+  }
+  return fallback();
 }
 
 /* ============ 데이터 저장소 (Supabase + 로컬 미리보기 지원) ============ */
@@ -339,11 +437,11 @@ function initDemoData() {
   const t = now();
   App.demo = true; App.me = 'demo-me'; App.email = 'demo@baggullae.kr'; App.session = true; App.loading = false;
   S.profiles = {
-    'demo-me': {nickname:'민트귤', region:'마포구', wants:[{t:'cat', c:11}, {t:'kw', k:'무드등'}], tradeCount:1, createdAt:t - 864000000},
-    'ex-pocamo': {nickname:'포카모아', region:'마포구', wants:[{t:'cat', c:22}], example:false, tradeCount:2, createdAt:t - 3456000000},
-    'ex-sora': {nickname:'소라향기', region:'마포구', wants:[{t:'kw', k:'포카'}, {t:'cat', c:11}], example:false, tradeCount:1, createdAt:t - 2160000000},
-    'ex-jun': {nickname:'준이네살림', region:'성동구', wants:[{t:'cat', c:31}], example:false, tradeCount:1, createdAt:t - 5184000000},
-    'ex-hana': {nickname:'하나둘클립', region:'성동구', wants:[{t:'cat', c:3}], example:false, tradeCount:2, createdAt:t - 1555200000}
+    'demo-me': {nickname:'민트귤', region:'마포구', dong:'서교동', loc:{lat:37.556, lng:126.924}, locVerified:true, wants:[{t:'cat', c:11}, {t:'kw', k:'무드등'}], tradeCount:1, createdAt:t - 864000000},
+    'ex-pocamo': {nickname:'포카모아', region:'마포구', dong:'합정동', loc:{lat:37.549, lng:126.914}, wants:[{t:'cat', c:22}], example:false, tradeCount:2, createdAt:t - 3456000000},
+    'ex-sora': {nickname:'소라향기', region:'마포구', dong:'망원동', loc:{lat:37.556, lng:126.910}, wants:[{t:'kw', k:'포카'}, {t:'cat', c:11}], example:false, tradeCount:1, createdAt:t - 2160000000},
+    'ex-jun': {nickname:'준이네살림', region:'성동구', dong:'성수동1가', loc:{lat:37.545, lng:127.056}, wants:[{t:'cat', c:31}], example:false, tradeCount:1, createdAt:t - 5184000000},
+    'ex-hana': {nickname:'하나둘클립', region:'성동구', dong:'성수동2가', loc:{lat:37.544, lng:127.058}, wants:[{t:'cat', c:3}], example:false, tradeCount:2, createdAt:t - 1555200000}
   };
   S.items = {
     'demo-my1': {owner:'demo-me', title:'미개봉 립 틴트 로즈 컬러', cat:22, cond:'sealed', value:18000, pref:'any', methods:['meet','door'], meet:{lat:37.5572, lng:126.9245, name:'홍대입구역 근처'}, photos:[], desc:'선물 받아 보관만 했어요.', region:'마포구', status:'available', createdAt:t - 3600000, challengeId:null},
@@ -528,7 +626,7 @@ function homeGreeting(me, currentMs = now()) {
 }
 
 /* ============ 렌더링 ============ */
-const UI = {tab:'home', homeSeg:'match', filterCat:0, filterMethod:'', offerSeg:'recv', chalSeg:'active', meSeg:'items', stack:[], enterTab:true, scroll:{}, renderedTab:'home'};
+const UI = {tab:'home', homeSeg:'match', filterCat:0, filterMethod:'', rangeKm:0, sortBy:'recent', offerSeg:'recv', chalSeg:'active', meSeg:'items', stack:[], enterTab:true, scroll:{}, renderedTab:'home', _segPrev:{}};
 let renderQueued = false;
 function scheduleRender() { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); }
 
@@ -552,6 +650,7 @@ function renderSidebar(totalOfferBadge) {
   sbEl.classList.toggle('hidden', !show);
   if (!show) return;
   const me = profileOf(App.me);
+  const regTxt = LOC.userRegionLabel ? LOC.userRegionLabel(me) : me.region;
   const tabs = [
     ['home', '홈', I.home, 0],
     ['challenge', '챌린지', I.clip, 0],
@@ -562,7 +661,7 @@ function renderSidebar(totalOfferBadge) {
     <nav class="sb-nav" aria-label="데스크톱 메뉴">${tabs.map(([id, label, icon, badge]) => `<button class="sb-tab ${UI.tab === id ? 'on' : ''}" data-act="tab" data-tab="${id}">${icon}<span>${label}</span>${badge ? `<span class="sb-badge">${badge}</span>` : ''}</button>`).join('')}
       <button class="btn btn-primary btn-block sb-cta" data-act="newItem">${I.plus}물건 등록</button>
     </nav>
-    <button class="sb-user" data-act="tab" data-tab="me" style="text-align:left">${avatar(App.me, 'sm')}<div><b>${esc(me.nickname)}</b><span>${esc(me.region)} · ${tempOf(App.me).toFixed(1)}°C</span></div></button>`;
+    <button class="sb-user" data-act="tab" data-tab="me" style="text-align:left">${avatar(App.me, 'sm')}<div><b>${esc(me.nickname)}</b><span>${esc(regTxt)} · ${tempOf(App.me).toFixed(1)}°C</span></div></button>`;
 }
 
 function render() {
@@ -581,8 +680,14 @@ function render() {
   const html = ({home:viewHome, challenge:viewChallenges, offers:viewOffers, me:viewMe})[UI.tab]();
   main.innerHTML = `<div class="view" id="tabview"><div class="ptr" id="ptr"><span class="ptr-spin"></span><span id="ptrTxt">당겨서 새로고침</span></div>${html}</div>`;
   const tv = $('#tabview');
-  if (UI.enterTab) { tv.querySelectorAll('.stagger').forEach(el => el.classList.add('enter')); UI.enterTab = false; tv.scrollTop = 0; }
-  else tv.scrollTop = UI.scroll[UI.tab] || 0;
+  if (UI.enterTab) {
+    tv.classList.add('tab-enter');
+    tv.querySelectorAll('.stagger, .group, .grid2, .hscroll').forEach(el => el.classList.add('enter'));
+    UI.enterTab = false;
+    tv.scrollTop = 0;
+  } else {
+    tv.scrollTop = UI.scroll[UI.tab] || 0;
+  }
   UI.renderedTab = UI.tab;
   bindScroll(tv);
   bindPullToRefresh(tv);
@@ -643,11 +748,24 @@ function bindPullToRefresh(v) {
 
 function initSegs(root) {
   $$('.seg', root).forEach(seg => {
-    const btns = $$('button', seg); const on = btns.findIndex(b => b.classList.contains('on'));
-    let ind = $('.seg-ind', seg); if (!ind) { ind = document.createElement('i'); ind.className = 'seg-ind'; seg.prepend(ind); }
-    const w = 100 / btns.length;
-    ind.style.width = `calc(${w}% - ${8 / btns.length}px)`;
-    ind.style.transform = `translateX(${Math.max(0, on) * 100}%)`;
+    const btns = $$('button', seg);
+    const on = Math.max(0, btns.findIndex(b => b.classList.contains('on')));
+    let ind = $('.seg-ind', seg);
+    if (!ind) { ind = document.createElement('i'); ind.className = 'seg-ind'; seg.prepend(ind); }
+    const w = 100 / Math.max(1, btns.length);
+    ind.style.width = `calc(${w}% - ${8 / Math.max(1, btns.length)}px)`;
+    const key = seg.dataset.seg || seg.id;
+    const prevIdx = key && UI._segPrev[key] != null ? UI._segPrev[key] : on;
+    if (key) UI._segPrev[key] = on;
+    if (key && prevIdx !== on && prevIdx < btns.length) {
+      ind.style.transition = 'none';
+      ind.style.transform = `translateX(${prevIdx * 100}%)`;
+      void ind.offsetWidth;
+      ind.style.transition = '';
+      requestAnimationFrame(() => { ind.style.transform = `translateX(${on * 100}%)`; });
+    } else {
+      ind.style.transform = `translateX(${on * 100}%)`;
+    }
   });
 }
 
@@ -661,31 +779,36 @@ function itemRow(it) {
   const ch = challengeOf(it);
   const veil = it.status === 'reserved' ? '<div class="veil">예약중</div>' : it.status === 'traded' ? '<div class="veil">교환완료</div>' : '';
   const p = profileOf(it.owner);
+  const regLabel = LOC.userRegionLabel ? LOC.userRegionLabel(p.region ? p : {region:it.region || ''}) : (p.region || it.region || '');
+  const dist = it.owner !== App.me ? itemDistStr(it) : '';
   return `<button class="row" data-act="openItem" data-id="${it.id}" aria-label="${esc(it.title)} 상세 보기">
     <div class="thumb">${itemImg(it)}${veil}</div>
     <div class="row-body">
       <div class="row-title">${esc(it.title)}</div>
-      <div class="row-meta">${esc(p.region || it.region || '')} · ${ago(it.createdAt)}</div>
+      <div class="row-meta">${esc(regLabel)}${dist ? ' · ' + esc(dist) : ''} · ${ago(it.createdAt)}</div>
       ${it.value ? `<div class="row-value num">${won(it.value)}</div>` : '<div class="row-value muted">가치 비공개</div>'}
       <div class="row-tags">${ch ? `<span class="tag accent">${I.clip}챌린지 ${ch.steps.length}단계</span>` : ''}<span class="tag">${COND[it.cond]}</span>${methodTags(it.methods)}</div>
     </div></button>`;
 }
 function matchCard(it, perfect) {
   const p = profileOf(it.owner);
-  return `<button class="mcard" data-act="openItem" data-id="${it.id}" aria-label="${esc(it.title)} 보기"><div class="mimg">${itemImg(it)}${perfect ? '<span class="mbadge tag solid-contrast">서로 찾던 물건</span>' : ''}</div><div class="mbody"><div class="mt">${esc(it.title)}</div><div class="mm">${esc(p.nickname)} · ${esc(p.region || '')}</div></div></button>`;
+  const dist = it.owner !== App.me ? itemDistStr(it) : '';
+  return `<button class="mcard" data-act="openItem" data-id="${it.id}" aria-label="${esc(it.title)} 보기"><div class="mimg">${itemImg(it)}${perfect ? '<span class="mbadge tag solid-contrast">서로 찾던 물건</span>' : ''}</div><div class="mbody"><div class="mt">${esc(it.title)}</div><div class="mm">${esc(p.nickname)} · ${esc(dist || p.region || '')}</div></div></button>`;
 }
 
 /* ---- 홈 ---- */
 function viewHome() {
   const me = profileOf(App.me);
   const nUnread = unreadNotifCount();
+  const regionLabel = LOC.userRegionLabel ? LOC.userRegionLabel(me) : me.region;
   const right = `<div class="nav-actions">
+    <button class="nav-btn" data-act="openNearbyMap" aria-label="주변 물건 지도로 보기">${I.map}</button>
     <button class="nav-btn" data-act="openNotifs" aria-label="알림${nUnread ? ' (' + nUnread + '개 안 읽음)' : ''}">${I.bell}${nUnread ? `<span class="bell-badge">${nUnread > 99 ? '99+' : nUnread}</span>` : ''}</button>
     <button class="nav-btn" data-act="openWants" aria-label="찾는 것 관리">${I.target}</button>
   </div>`;
-  let h = `<div class="nav"><button class="region-btn" data-act="editProfile" aria-label="내 동네 변경 (${esc(me.region)})">${esc(me.region)}${I.down}</button><div class="nav-title">홈</div>${right}</div>`;
+  let h = `<div class="nav"><button class="region-btn" data-act="openRegion" aria-label="내 동네 설정 (${esc(regionLabel)})">${me.locVerified ? '<span class="region-dot" aria-hidden="true"></span>' : ''}<span class="rb-txt">${esc(regionLabel)}</span>${I.down}</button><div class="nav-title">홈</div>${right}</div>`;
   h += `<div class="home-sub">${esc(homeGreeting(me))}</div>`;
-  h += `<div class="seg" role="tablist" aria-label="홈 보기 방식"><button role="tab" aria-selected="${UI.homeSeg === 'match'}" class="${UI.homeSeg === 'match' ? 'on' : ''}" data-act="homeSeg" data-v="match">추천 매칭</button><button role="tab" aria-selected="${UI.homeSeg === 'all'}" class="${UI.homeSeg === 'all' ? 'on' : ''}" data-act="homeSeg" data-v="all">전체 물건</button></div>`;
+  h += `<div class="seg" data-seg="homeSeg" role="tablist" aria-label="홈 보기 방식"><button role="tab" aria-selected="${UI.homeSeg === 'match'}" class="${UI.homeSeg === 'match' ? 'on' : ''}" data-act="homeSeg" data-v="match">추천 매칭</button><button role="tab" aria-selected="${UI.homeSeg === 'all'}" class="${UI.homeSeg === 'all' ? 'on' : ''}" data-act="homeSeg" data-v="all">전체 물건</button></div>`;
   if (App.readOnly) h += `<div class="note">${I.info}<span>보기 전용으로 열렸어요. 물건을 등록하거나 제안하려면 공유 설정에서 참여자 권한이 필요해요.</span></div>`;
 
   const prog = onboardingProgress(App.me);
@@ -713,14 +836,18 @@ function viewHome() {
     h += `<div class="stagger desktop-2col"><div>${leftCol}</div><div>${rightCol}</div></div>`;
   } else {
     h += `<div class="chips" role="group" aria-label="카테고리 필터"><button class="chip ${!UI.filterCat ? 'on' : ''}" data-act="fCat" data-v="0">전체</button>${CATS.map(c => `<button class="chip ${UI.filterCat === c.id ? 'on' : ''}" data-act="fCat" data-v="${c.id}">${c.n}</button>`).join('')}</div>`;
-    h += `<div class="chips" style="margin-top:-4px" role="group" aria-label="교환 방식 필터"><button class="chip ${!UI.filterMethod ? 'on-accent' : ''}" data-act="fMethod" data-v="">모든 방식</button>${Object.entries(METHODS).map(([k, v]) => `<button class="chip ${UI.filterMethod === k ? 'on-accent' : ''}" data-act="fMethod" data-v="${k}">${I[k]}${v}</button>`).join('')}</div>`;
-    let list = allItems().filter(i => i.status !== 'traded');
-    if (UI.filterCat) list = list.filter(i => parentOf(i.cat) === UI.filterCat);
-    if (UI.filterMethod) list = list.filter(i => !i.methods || !i.methods.length || i.methods.includes(UI.filterMethod));
-    list.sort((a, b) => b.createdAt - a.createdAt);
-    const hasFilter = UI.filterCat || UI.filterMethod;
+    h += `<div class="chips" style="margin-top:-4px" role="group" aria-label="교환 방식 및 거리 필터"><button class="chip ${!UI.filterMethod ? 'on-accent' : ''}" data-act="fMethod" data-v="">모든 방식</button>${Object.entries(METHODS).map(([k, v]) => `<button class="chip ${UI.filterMethod === k ? 'on-accent' : ''}" data-act="fMethod" data-v="${k}">${I[k]}${v}</button>`).join('')}<button class="chip ${UI.sortBy === 'distance' ? 'on' : ''}" data-act="toggleSort" aria-pressed="${UI.sortBy === 'distance'}">${I.pin}가까운 순</button></div>`;
+    let rawList = allItems().filter(i => i.status !== 'traded');
+    if (UI.filterCat) rawList = rawList.filter(i => parentOf(i.cat) === UI.filterCat);
+    if (UI.filterMethod) rawList = rawList.filter(i => !i.methods || !i.methods.length || i.methods.includes(UI.filterMethod));
+    const entries = LOC.filterAndSortItems
+      ? LOC.filterAndSortItems(rawList, {rangeKm:UI.rangeKm, sortBy:UI.sortBy, myCoords:myGeoCoords(), getOwner:profileOf, cent:CENT})
+      : rawList.sort((a, b) => b.createdAt - a.createdAt).map(item => ({item, dist:null}));
+    const list = entries.map(e => e.item);
+    const hasFilter = UI.filterCat || UI.filterMethod || UI.rangeKm > 0;
     const emptyBtn = hasFilter ? '<button class="btn btn-gray btn-sm" data-act="resetFilter">필터 초기화하기</button>' : '<button class="btn btn-primary btn-sm" data-act="newItem">첫 물건 등록하기</button>';
-    h += `<div class="stagger">${list.length ? `<div class="group">${list.map(itemRow).join('')}</div>` : `<div class="group">${emptyBox('search', '조건에 맞는 물건이 없어요', '필터를 초기화하거나 새 물건을 등록해 보세요.', emptyBtn)}</div>`}</div>`;
+    h += `<div class="map-toolbar"><span class="mt-info">${UI.rangeKm ? `${esc(me.region)} 반경 ${UI.rangeKm}km · ` : ''}${list.length}개${UI.sortBy === 'distance' ? ' (가까운 순)' : ''}</span><button class="map-pill-btn" data-act="openNearbyMap">${I.map}지도로 보기</button></div>`;
+    h += `<div class="stagger">${list.length ? `<div class="group">${list.map(itemRow).join('')}</div>` : `<div class="group">${emptyBox('search', '조건에 맞는 물건이 없어요', UI.rangeKm ? `반경 ${UI.rangeKm}km 범위를 넓히거나 필터를 초기화해 보세요.` : '필터를 초기화하거나 새 물건을 등록해 보세요.', emptyBtn)}</div>`}</div>`;
   }
   return h;
 }
@@ -734,7 +861,7 @@ function viewChallenges() {
     <div class="banner"><div class="bicon">${I.clip}</div><div style="flex:1"><div class="bt">볼펜 하나로 어디까지 갈 수 있을까?</div><div class="bs">작은 물건에서 시작해 교환을 이어가 보세요</div></div></div>
     <div style="padding:0 16px 18px">${mine ? `<button class="btn btn-tint btn-block" data-act="openChallenge" data-id="${mine.id}">${I.clip}내 챌린지 이어가기 · ${mine.steps.length}단계</button>` : `<button class="btn btn-primary btn-block" data-act="startChallenge">${I.plus}나도 챌린지 시작하기</button>`}</div>
   </div><div>`;
-  h += `<div class="seg"><button class="${UI.chalSeg === 'active' ? 'on' : ''}" data-act="chalSeg" data-v="active">진행 중</button><button class="${UI.chalSeg === 'finished' ? 'on' : ''}" data-act="chalSeg" data-v="finished">완주</button></div>`;
+  h += `<div class="seg" data-seg="chalSeg"><button class="${UI.chalSeg === 'active' ? 'on' : ''}" data-act="chalSeg" data-v="active">진행 중</button><button class="${UI.chalSeg === 'finished' ? 'on' : ''}" data-act="chalSeg" data-v="finished">완주</button></div>`;
   const list = challenges().filter(c => c.status === UI.chalSeg).sort((a, b) => (b.cheers || []).length - (a.cheers || []).length || b.createdAt - a.createdAt);
   const empBtn = UI.chalSeg === 'active'
     ? '<button class="btn btn-primary btn-sm" data-act="startChallenge">챌린지 시작하기</button>'
@@ -755,7 +882,7 @@ function viewOffers() {
   const pendN = recv.filter(o => o.status === 'pending').length;
   const chatN = unreadChatCount();
   let h = navBar('제안함') + '<div class="large-title">제안함</div>';
-  h += `<div class="seg" role="tablist">
+  h += `<div class="seg" data-seg="offerSeg" role="tablist">
     <button role="tab" class="${UI.offerSeg === 'recv' ? 'on' : ''}" data-act="offerSeg" data-v="recv">받은 제안${pendN ? ' · ' + pendN : ''}</button>
     <button role="tab" class="${UI.offerSeg === 'sent' ? 'on' : ''}" data-act="offerSeg" data-v="sent">보낸 제안</button>
     <button role="tab" class="${UI.offerSeg === 'chat' ? 'on' : ''}" data-act="offerSeg" data-v="chat">채팅${chatN ? ' · ' + chatN : ''}</button>
@@ -844,14 +971,15 @@ function viewMe() {
   let h = navBar('나의 바꿀래') + '<div class="large-title">나의 바꿀래</div><div class="stagger desktop-2col"><div>';
   h += profileBlock(App.me, true);
   const wants = wantsOf(App.me);
+  const myRegionTxt = LOC.userRegionLabel ? LOC.userRegionLabel(profileOf(App.me)) : profileOf(App.me).region;
   h += `<div class="section"><div class="section-head"><h2>찾는 것</h2><button class="more" data-act="openWants">편집 ${wants.length}/5</button></div><div class="chips">${wants.length ? wants.map(w => `<span class="chip">${esc(wantLabel(w))}</span>`).join('') : '<button class="chip" data-act="openWants">' + I.plus + '찾는 것 등록</button>'}</div></div>`;
   h += `<div class="group-label">설정</div><div class="group">
-    <button class="menu-row" data-act="editProfile"><span class="mi" style="background:var(--accent)">${I.pin}</span><span class="ml">내 동네</span><span class="mv">${esc(profileOf(App.me).region)}</span><span class="chev">${I.chev}</span></button>
+    <button class="menu-row" data-act="openRegion"><span class="mi" style="background:var(--accent)">${I.pin}</span><span class="ml">내 동네 설정</span><span class="mv">${esc(myRegionTxt)}</span><span class="chev">${I.chev}</span></button>
     <button class="menu-row" data-act="changePassword"><span class="mi" style="background:var(--contrast)">${I.lock}</span><span class="ml">비밀번호 변경</span><span class="chev">${I.chev}</span></button>
     <button class="menu-row" data-act="showPolicy"><span class="mi" style="background:var(--good)">${I.shield}</span><span class="ml">안전한 교환 가이드</span><span class="chev">${I.chev}</span></button>
     <button class="menu-row danger" data-act="logout"><span class="mi" style="background:var(--bad)">${I.logout}</span><span class="ml">로그아웃</span></button>
     <button class="menu-row danger" data-act="deleteAccount"><span class="mi" style="background:var(--muted)">${I.trash}</span><span class="ml">회원 탈퇴</span></button></div></div><div>`;
-  h += `<div class="seg"><button class="${UI.meSeg === 'items' ? 'on' : ''}" data-act="meSeg" data-v="items">내 물건</button><button class="${UI.meSeg === 'favs' ? 'on' : ''}" data-act="meSeg" data-v="favs">찜한 물건</button><button class="${UI.meSeg === 'reviews' ? 'on' : ''}" data-act="meSeg" data-v="reviews">받은 후기</button></div>`;
+  h += `<div class="seg" data-seg="meSeg"><button class="${UI.meSeg === 'items' ? 'on' : ''}" data-act="meSeg" data-v="items">내 물건</button><button class="${UI.meSeg === 'favs' ? 'on' : ''}" data-act="meSeg" data-v="favs">찜한 물건</button><button class="${UI.meSeg === 'reviews' ? 'on' : ''}" data-act="meSeg" data-v="reviews">받은 후기</button></div>`;
   if (UI.meSeg === 'items') {
     const its = itemsOf(App.me);
     h += its.length ? gridCards(its) : `<div class="group">${emptyBox('camera', '등록한 물건이 없어요', '안 쓰는 물건을 올리고 필요한 물건과 바꿔 보세요.', '<button class="btn btn-primary btn-sm" data-act="newItem">물건 등록하기</button>')}</div>`;
@@ -951,13 +1079,17 @@ function pageItem(id) {
   const fav = isFavorite(id);
   let h = `<div class="view no-tab">${navBar(it.title, {back:true, right: mine ? `<button class="nav-btn" data-act="itemMenu" data-id="${id}" aria-label="물건 관리 메뉴">${I.more}</button>` : `<button class="nav-btn" data-act="reportUser" data-id="${it.owner}" aria-label="사용자 신고">${I.flag}</button>`})}`;
   h += `<div class="gallery">${photos ? `<div class="gallery-track">${photos.map((s, i) => `<img src="${esc(s)}" alt="${esc(it.title)} 사진 ${i + 1}" data-act="viewPhoto" data-id="${id}" data-idx="${i}">`).join('')}</div>` : `<div class="gallery-track">${phBox(it.cat)}</div>`}${photos && photos.length > 1 ? `<div class="dots">${photos.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div>` : ''}</div>`;
-  h += `<button class="seller" data-act="openUser" data-id="${it.owner}">${avatar(it.owner)}<div><div class="sn">${esc(p.nickname)}${isExample(it.owner) ? ' <span class="tag">예시</span>' : ''}</div><div class="sr">${esc(p.region)}</div></div><div class="temp"><div class="tv num" style="color:${tempColor(t)}">${t.toFixed(1)}°C</div><div class="tb"><i style="width:${Math.min(100, t)}%;background:${tempColor(t)}"></i></div><div class="tl">교환온도</div></div></button>`;
+  h += `<button class="seller" data-act="openUser" data-id="${it.owner}">${avatar(it.owner)}<div><div class="sn">${esc(p.nickname)}${isExample(it.owner) ? ' <span class="tag">예시</span>' : ''}</div><div class="sr">${esc(LOC.userRegionLabel ? LOC.userRegionLabel(p) : p.region)}${!mine && itemDistStr(it) ? ' · ' + esc(itemDistStr(it)) : ''}</div></div><div class="temp"><div class="tv num" style="color:${tempColor(t)}">${t.toFixed(1)}°C</div><div class="tb"><i style="width:${Math.min(100, t)}%;background:${tempColor(t)}"></i></div><div class="tl">교환온도</div></div></button>`;
   h += `<div class="detail">`;
   if (ch) h += `<button class="note" style="margin:0 0 14px;width:100%;text-align:left" data-act="openChallenge" data-id="${it.challengeId}">${I.clip}<span>빨간 클립 챌린지 <b>${ch.steps.length}단계</b> 물건이에요. “${esc(ch.title)}” 타임라인 보기</span></button>`;
   h += `<h1>${esc(it.title)}</h1><div class="dm">${CAT_NAME[parentOf(it.cat)]} › ${CAT_NAME[it.cat]} · ${ago(it.createdAt)}</div>`;
   if (it.desc) h += `<div class="dd">${esc(it.desc)}</div>`;
   h += `<div class="specs"><div class="spec"><span class="k">상태</span><span class="v">${COND[it.cond]}</span></div><div class="spec"><span class="k">가치</span><span class="v num">${it.value ? won(it.value) + ' 상당' : '비공개'}</span></div><div class="spec"><span class="k">교환 성향</span><span class="v">${PREF[it.pref] || '가치 상관없음'}</span></div><div class="spec"><span class="k">교환 방식</span><span class="v">${it.methods && it.methods.length ? it.methods.map(m => METHODS[m]).join(' · ') : '협의 가능'}</span></div></div>`;
-  if (it.meet) h += `<div class="place"><div class="pmap">${miniMap(it.meet)}</div><div class="pinfo"><div class="pn">${esc(it.meet.name)}<small>대면 교환 희망 장소</small></div><a href="${kakaoMapUrl(it.meet)}" target="_blank" rel="noopener">카카오맵</a></div></div>`;
+  if (it.meet) {
+    const mc = myGeoCoords();
+    const md = mc ? formatDist(haversine(mc.lat, mc.lng, it.meet.lat, it.meet.lng)) : '';
+    h += `<div class="place"><div class="pmap">${miniMap(it.meet)}</div><div class="pinfo"><div class="pn">${esc(it.meet.name)}<small>대면 교환 희망 장소${md ? ' · 내 동네에서 약 ' + esc(md) : ''}</small></div><a href="${kakaoMapUrl(it.meet)}" target="_blank" rel="noopener">카카오맵</a></div></div>`;
+  }
   const wants = wantsOf(it.owner);
   if (wants.length && !mine) h += `<div style="margin-top:18px"><div class="lbl" style="font-size:.9rem;font-weight:700;margin:0 4px 8px">${esc(p.nickname)}님이 찾는 것</div><div class="chips wrap">${wants.map(w => `<span class="chip ${itemsOf(App.me).some(mi => mi.status === 'available' && wantMatches(mi, w)) ? 'on-accent' : ''}">${esc(wantLabel(w))}</span>`).join('')}</div></div>`;
   h += `</div></div>`;
@@ -1341,7 +1473,7 @@ async function withLock(btn, busyText, fn) {
 function guardWrite() { if (App.readOnly) { toast('보기 전용이라 저장할 수 없어요. 참여자 권한을 확인해 주세요.'); return false; } return true; }
 
 /* ============ 인증 (로그인 · 회원가입 · 비밀번호 찾기/재설정 · 온보딩) ============ */
-const OB = {step:0, nickname:'', region:'', wants:[], agree:[false, false, false]};
+const OB = {step:0, nickname:'', region:'', dong:'', loc:null, locVerified:false, wants:[], agree:[false, false, false]};
 function renderAuth() {
   let a = $('#auth'); if (!a) { a = document.createElement('div'); a.id = 'auth'; a.className = 'auth'; $('#stage').appendChild(a); }
   $('#fab').classList.add('hidden'); $('#tabbar').classList.add('hidden');
@@ -1351,6 +1483,44 @@ function renderAuth() {
     <div class="auth-feats"><div class="auth-feat"><i style="background:var(--accent-soft);color:var(--accent-text)">${I.sparkle}</i>서로 찾던 물건끼리 자동 매칭</div><div class="auth-feat"><i style="background:var(--contrast-soft);color:var(--contrast-text)">${I.pin}</i>대면 · 문고리 · 택배, 원하는 방식으로</div><div class="auth-feat"><i style="background:var(--surface-2);color:var(--text)">${I.clip}</i>볼펜 하나로 시작하는 빨간 클립 챌린지</div></div></div>
     <div class="auth-actions"><button class="btn btn-primary btn-block" data-act="signup">시작하기 · 회원가입</button><button class="btn btn-gray btn-block" data-act="login">이미 가입했어요 · 로그인</button></div>
     <div class="auth-foot">로그인은 Supabase 인증으로 안전하게 처리돼요.</div>`;
+}
+
+function leaveAuth(msg) {
+  const a = $('#auth'); UI.tab = 'home'; UI.enterTab = true;
+  if (!a) { render(); if (msg) toast(msg); return; }
+  a.dataset.leaving = '1';
+  a.style.pointerEvents = 'none';
+  a.style.transition = 'opacity .34s var(--spring), transform .42s var(--spring)';
+  a.style.opacity = '0';
+  a.style.transform = 'scale(1.03)';
+  render();
+  setTimeout(() => {
+    if (document.body.contains(a)) a.remove();
+    if (msg) toast(msg);
+  }, 360);
+}
+
+function renderOnboard(animate = true) {
+  const a = $('#auth'); a.dataset.mode = 'onboard';
+  const s = OB.step;
+  let body = '';
+  if (s === 0) body = `<h2>반가워요!<br>어떻게 불러드릴까요?</h2><p class="lead">교환할 때 상대에게 보이는 닉네임이에요.</p><div class="field"><label for="obNick">닉네임</label><input class="input" id="obNick" maxlength="10" placeholder="2~10자 닉네임" value="${esc(OB.nickname)}" autocomplete="nickname"><div class="hint" id="obNickHint">한글, 영문, 숫자로 2~10자</div></div>`;
+  else if (s === 1) body = `<h2>어느 동네에서<br>교환하시나요?</h2><p class="lead">현재 위치로 찾거나 아래에서 직접 고를 수 있어요.</p>
+    <button type="button" class="loc-btn" data-act="obGps" id="obGpsBtn" style="margin-bottom:12px">${I.gps}<span>현재 위치로 내 동네 찾기</span></button>
+    <div id="obGpsStatus" style="margin-bottom:12px">${OB.locVerified && OB.region ? `<div class="loc-verified">${I.check}<span>${esc(OB.dong ? `${OB.region} · ${OB.dong}` : OB.region)} 확인됨</span></div>` : ''}</div>
+    <div class="region-grid">${REGIONS.map(r => `<button class="chip ${OB.region === r ? 'on-accent' : ''}" data-act="obRegion" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>`;
+  else if (s === 2) body = `<h2>찾고 있는 물건이<br>있나요?</h2><p class="lead">나중에 등록해도 괜찮아요. 최대 5개까지 고를 수 있어요.</p><div class="chips wrap">${CATS.map(c => c.subs.map(([id, n]) => { const on = OB.wants.some(w => w.c === id); return `<button class="chip ${on ? 'on-accent' : ''}" data-act="obWant" data-v="${id}">${n}</button>`; }).join('')).join('')}</div>`;
+  else body = `<h2>마지막으로<br>약속해 주세요</h2><p class="lead">모두가 믿고 교환할 수 있도록 지켜야 할 것들이에요.</p>${[['이용약관 동의 (필수)', '교환은 당사자 간 거래이며 바꿀래는 중개하지 않아요.'], ['개인정보 처리 동의 (필수)', '닉네임·동네·등록 물건만 저장해요. 주소는 저장하지 않아요.'], ['안전 교환 약속 (필수)', '대면은 역·카페 같은 공공장소에서, 현금 거래는 하지 않아요.']].map(([b, t], i) => `<button class="check-row ${OB.agree[i] ? 'on' : ''}" data-act="obAgree" data-i="${i}"><span class="cbox">${I.check}</span><span><b>${b}</b><span>${t}</span></span></button>`).join('')}`;
+  const can = s === 0 ? validNick(OB.nickname) === '' : s === 1 ? !!OB.region : s === 2 ? true : OB.agree.every(Boolean);
+  a.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="nav-btn" data-act="obBack" aria-label="뒤로">${I.back}</button></div><div class="steps-dots">${[0, 1, 2, 3].map(i => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div><div class="ob-step ${animate ? 'anim' : ''}" style="flex:1">${body}</div><div class="auth-actions" style="margin-top:20px;animation:none">${s === 2 ? `<button class="btn btn-primary btn-block" data-act="obNext">${OB.wants.length ? OB.wants.length + '개 선택 · 다음' : '건너뛰기'}</button>` : `<button class="btn btn-primary btn-block" data-act="obNext" ${can ? '' : 'disabled'}>${s === 3 ? '가입 완료' : '다음'}</button>`}</div>`;
+  if (s === 0) { const inp = $('#obNick'); setTimeout(() => inp.focus(), 300); inp.addEventListener('input', () => { OB.nickname = inp.value; const err = validNick(inp.value); const h = $('#obNickHint'); h.textContent = err || '좋은 닉네임이에요!'; h.classList.toggle('err', !!err && inp.value.length > 0); $('[data-act="obNext"]').disabled = !!err; }); inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !validNick(inp.value)) ACT.obNext(); }); }
+}
+function validNick(v, self) {
+  v = (v || '').trim();
+  if (v.length < 2 || v.length > 10) return '닉네임 길이가 맞지 않아요. 2~10자로 입력해 주세요.';
+  if (!/^[가-힣a-zA-Z0-9]+$/.test(v)) return '사용할 수 없는 글자가 있어요. 한글, 영문, 숫자만 써 주세요.';
+  if (Object.entries(S.profiles).some(([id, p]) => id !== self && p.nickname === v)) return '이미 쓰고 있는 닉네임이에요. 다른 닉네임을 입력해 주세요.';
+  return '';
 }
 
 function evalPasswordSecurity(pw, pw2 = '') {
@@ -1546,41 +1716,13 @@ function renderNewPassword() {
   });
 }
 
-function leaveAuth(msg) {
-  const a = $('#auth'); UI.tab = 'home'; UI.enterTab = true;
-  if (!a) { render(); if (msg) toast(msg); return; }
-  a.dataset.leaving = '1'; a.style.transition = 'opacity .4s, transform .5s var(--spring)'; a.style.opacity = 0; a.style.transform = 'scale(1.04)';
-  render();
-  setTimeout(() => { a.remove(); render(); if (msg) toast(msg); }, 350);
-}
-
-function renderOnboard(animate = true) {
-  const a = $('#auth'); a.dataset.mode = 'onboard';
-  const s = OB.step;
-  let body = '';
-  if (s === 0) body = `<h2>반가워요!<br>어떻게 불러드릴까요?</h2><p class="lead">교환할 때 상대에게 보이는 닉네임이에요.</p><div class="field"><label for="obNick">닉네임</label><input class="input" id="obNick" maxlength="10" placeholder="2~10자 닉네임" value="${esc(OB.nickname)}" autocomplete="nickname"><div class="hint" id="obNickHint">한글, 영문, 숫자로 2~10자</div></div>`;
-  else if (s === 1) body = `<h2>어느 동네에서<br>교환하시나요?</h2><p class="lead">가까운 이웃의 물건을 먼저 보여드려요.</p><div class="region-grid">${REGIONS.map(r => `<button class="chip ${OB.region === r ? 'on-accent' : ''}" data-act="obRegion" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>`;
-  else if (s === 2) body = `<h2>찾고 있는 물건이<br>있나요?</h2><p class="lead">나중에 등록해도 괜찮아요. 최대 5개까지 고를 수 있어요.</p><div class="chips wrap">${CATS.map(c => c.subs.map(([id, n]) => { const on = OB.wants.some(w => w.c === id); return `<button class="chip ${on ? 'on-accent' : ''}" data-act="obWant" data-v="${id}">${n}</button>`; }).join('')).join('')}</div>`;
-  else body = `<h2>마지막으로<br>약속해 주세요</h2><p class="lead">모두가 믿고 교환할 수 있도록 지켜야 할 것들이에요.</p>${[['이용약관 동의 (필수)', '교환은 당사자 간 거래이며 바꿀래는 중개하지 않아요.'], ['개인정보 처리 동의 (필수)', '닉네임·동네·등록 물건만 저장해요. 주소는 저장하지 않아요.'], ['안전 교환 약속 (필수)', '대면은 역·카페 같은 공공장소에서, 현금 거래는 하지 않아요.']].map(([b, t], i) => `<button class="check-row ${OB.agree[i] ? 'on' : ''}" data-act="obAgree" data-i="${i}"><span class="cbox">${I.check}</span><span><b>${b}</b><span>${t}</span></span></button>`).join('')}`;
-  const can = s === 0 ? validNick(OB.nickname) === '' : s === 1 ? !!OB.region : s === 2 ? true : OB.agree.every(Boolean);
-  a.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="nav-btn" data-act="obBack" aria-label="뒤로">${I.back}</button></div><div class="steps-dots">${[0, 1, 2, 3].map(i => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div><div class="ob-step ${animate ? 'anim' : ''}" style="flex:1">${body}</div><div class="auth-actions" style="margin-top:20px;animation:none">${s === 2 ? `<button class="btn btn-primary btn-block" data-act="obNext">${OB.wants.length ? OB.wants.length + '개 선택 · 다음' : '건너뛰기'}</button>` : `<button class="btn btn-primary btn-block" data-act="obNext" ${can ? '' : 'disabled'}>${s === 3 ? '가입 완료' : '다음'}</button>`}</div>`;
-  if (s === 0) { const inp = $('#obNick'); setTimeout(() => inp.focus(), 300); inp.addEventListener('input', () => { OB.nickname = inp.value; const err = validNick(inp.value); const h = $('#obNickHint'); h.textContent = err || '좋은 닉네임이에요!'; h.classList.toggle('err', !!err && inp.value.length > 0); $('[data-act="obNext"]').disabled = !!err; }); inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !validNick(inp.value)) ACT.obNext(); }); }
-}
-function validNick(v, self) {
-  v = (v || '').trim();
-  if (v.length < 2 || v.length > 10) return '닉네임 길이가 맞지 않아요. 2~10자로 입력해 주세요.';
-  if (!/^[가-힣a-zA-Z0-9]+$/.test(v)) return '사용할 수 없는 글자가 있어요. 한글, 영문, 숫자만 써 주세요.';
-  if (Object.entries(S.profiles).some(([id, p]) => id !== self && p.nickname === v)) return '이미 쓰고 있는 닉네임이에요. 다른 닉네임을 입력해 주세요.';
-  return '';
-}
-
 /* ============ 액션 ============ */
 const ACT = {
   tab(d) { if (UI.tab !== d.tab) { UI.tab = d.tab; UI.enterTab = true; } render(); },
   tabFromPage(d) { while (UI.stack.length) popPage(); UI.tab = d.tab; UI.enterTab = true; render(); },
   startDemo() { const a = $('#stage > .auth'); if (a) a.remove(); initDemoData(); render(); },
   browseAll() { while (UI.stack.length) popPage(); UI.tab = 'home'; UI.homeSeg = 'all'; UI.enterTab = true; render(); },
-  resetFilter() { UI.filterCat = 0; UI.filterMethod = ''; render(); },
+  resetFilter() { UI.filterCat = 0; UI.filterMethod = ''; UI.rangeKm = 0; UI.sortBy = 'recent'; render(); },
   back() { popPage(); },
   closeSheet(d, el) { closeSheet(el.closest('.sheet')); },
   homeSeg(d) { UI.homeSeg = d.v; UI.enterTab = true; render(); },
@@ -1589,6 +1731,9 @@ const ACT = {
   meSeg(d) { UI.meSeg = d.v; render(); },
   fCat(d) { UI.filterCat = +d.v; render(); },
   fMethod(d) { UI.filterMethod = d.v; render(); },
+  toggleSort() { UI.sortBy = UI.sortBy === 'distance' ? 'recent' : 'distance'; render(); },
+  openRegion() { openRegionSheet(); },
+  openNearbyMap() { openNearbyMapSheet(); },
   openItem(d) { if (!S.items[d.id]) return toast('삭제된 물건이에요. 다른 물건을 둘러보세요.'); pushPage({type:'item', id:d.id}); },
   openChallenge(d) { pushPage({type:'challenge', id:d.id}); },
   openUser(d) { if (d.id === App.me && !UI.stack.length) { UI.tab = 'me'; render(); return; } pushPage({type:'user', id:d.id}); },
@@ -1678,14 +1823,40 @@ const ACT = {
     if (OB.step > 0) { OB.step--; renderOnboard(); return; }
     if (await confirmDialog('가입을 그만둘까요?', '로그아웃되고, 다음에 로그인하면 프로필 만들기부터 이어서 할 수 있어요.', '그만두기', true)) { await signOut(); }
   },
-  obRegion(d, el) {
-    OB.region = d.v;
+  obRegion(d) {
+    OB.region = d.v; OB.dong = ''; OB.loc = CENT[d.v] ? {lat:CENT[d.v][0], lng:CENT[d.v][1]} : null; OB.locVerified = false;
     const a = $('#auth');
     if (a) {
       $$('[data-act="obRegion"]', a).forEach(b => b.classList.toggle('on-accent', b.dataset.v === OB.region));
+      const st = $('#obGpsStatus', a); if (st) st.innerHTML = '';
       const next = $('[data-act="obNext"]', a);
       if (next) next.disabled = !OB.region;
     } else renderOnboard(false);
+  },
+  async obGps(d, el) {
+    const a = $('#auth');
+    const orig = el.innerHTML;
+    el.disabled = true;
+    el.innerHTML = `<span class="loc-spin"></span><span>현재 위치를 확인하는 중…</span>`;
+    try {
+      const res = await detectCurrentNeighborhood();
+      OB.region = res.region;
+      OB.dong = res.dong;
+      OB.loc = {lat:res.lat, lng:res.lng};
+      OB.locVerified = true;
+      if (a) {
+        $$('[data-act="obRegion"]', a).forEach(b => b.classList.toggle('on-accent', b.dataset.v === OB.region));
+        const st = $('#obGpsStatus', a);
+        if (st) st.innerHTML = `<div class="loc-verified">${I.check}<span>${esc(res.fullLabel)} 확인됨${res.viaKakao ? ' (카카오맵)' : ''}</span></div>`;
+        const next = $('[data-act="obNext"]', a);
+        if (next) next.disabled = !OB.region;
+      }
+      toast(`${res.fullLabel}으로 설정했어요!`);
+    } catch (ex) {
+      toast(ex.message || '현재 위치를 확인하지 못했어요.');
+    } finally {
+      if (document.body.contains(el)) { el.disabled = false; el.innerHTML = orig; }
+    }
   },
   obWant(d, el) {
     const c = +d.v; const i = OB.wants.findIndex(w => w.c === c);
@@ -1726,7 +1897,10 @@ const ACT = {
           App.me = sd.session.user.id;
         }
         const nick = OB.nickname.trim();
-        await Store.set('profiles', App.me, {nickname:nick, region:OB.region, wants:OB.wants, tradeCount:0, createdAt:now(), agreedAt:now()});
+        await Store.set('profiles', App.me, {
+          nickname:nick, region:OB.region, dong:OB.dong || '', loc:OB.loc || null,
+          locVerified:!!OB.locVerified, wants:OB.wants, tradeCount:0, createdAt:now(), agreedAt:now()
+        });
         leaveAuth(`${nick}님, 환영해요!`);
       } catch (e) {}
     });
@@ -2028,14 +2202,16 @@ function openItemMenu(id) {
     }});
 }
 
-/* ============ 지도 선택 ============ */
+/* ============ 지도 선택 + 내 동네 설정 + 주변 물건 지도 ============ */
 function openMapPicker(initial, region, onPick) {
   let pick = initial ? {...initial} : null; let nameEdited = false;
-  const center = initial ? [initial.lat, initial.lng] : CENT[region] || SEOUL_CENTER;
+  const meCoord = myGeoCoords();
+  const center = initial ? [initial.lat, initial.lng] : meCoord ? [meCoord.lat, meCoord.lng] : (CENT[region] || SEOUL_CENTER);
+  const kNote = kakaoStatusNote();
   openSheet({title:'만남 장소 선택', full:true, body:'', onMount(sh) {
     const b = $('.sheet-body', sh); b.style.cssText = 'padding:0;display:flex;flex-direction:column;overflow:hidden';
-    b.innerHTML = `<div class="map-wrap"><div id="pickmap" aria-label="지도에서 위치를 눌러 고르세요"></div><div class="map-search"><span class="si">${I.search}</span><input class="input" id="mapQ" placeholder="${KAKAO_READY ? '장소, 역, 주소로 검색' : '역 이름이나 구 이름으로 찾기'}" aria-label="만남 장소 검색" autocomplete="off"><div class="map-results" id="mapR" hidden></div></div><div class="map-hint" id="mapHint">${KAKAO_READY ? '지도를 눌러 위치를 고르세요' : '간이 지도예요 · 지도를 눌러 위치를 고르세요'}</div></div>
-      <div class="map-panel"><div class="field" style="margin-bottom:12px"><label for="mapName">장소 이름 <small>상대에게 보여요</small></label><input class="input" id="mapName" maxlength="30" placeholder="지도를 누르면 자동으로 채워져요" value="${pick ? esc(pick.name) : ''}"></div><button class="btn btn-primary btn-block" id="mapOk" ${pick ? '' : 'disabled'}>이 위치로 정하기</button></div>`;
+    b.innerHTML = `<div class="map-wrap"><div id="pickmap" aria-label="지도에서 위치를 눌러 고르세요"></div><div class="map-search"><span class="si">${I.search}</span><input class="input" id="mapQ" placeholder="${KAKAO_READY ? '장소, 역, 주소로 검색' : '역 이름이나 구 이름으로 찾기'}" aria-label="만남 장소 검색" autocomplete="off"><div class="map-results" id="mapR" hidden></div></div><div class="map-hint" id="mapHint">${KAKAO_READY ? '지도를 눌러 위치를 고르세요' : '간이 지도예요 · 지도를 눌러 위치를 고르세요'}</div><button type="button" class="map-gps-btn" id="mapGpsBtn" aria-label="내 위치로 이동">${I.gps}</button></div>
+      <div class="map-panel">${kNote ? `<div class="note" style="margin:0 0 10px">${I.info}<span>${esc(kNote)}</span></div>` : ''}<div class="field" style="margin-bottom:12px"><label for="mapName">장소 이름 <small>상대에게 보여요</small></label><input class="input" id="mapName" maxlength="30" placeholder="지도를 누르면 자동으로 채워져요" value="${pick ? esc(pick.name) : ''}"></div><button class="btn btn-primary btn-block" id="mapOk" ${pick ? '' : 'disabled'}>이 위치로 정하기</button></div>`;
     const setPick = (lat, lng, name) => {
       const guess = placeName(lat, lng);
       pick = {lat, lng, name:name || guess}; nameEdited = false;
@@ -2046,6 +2222,18 @@ function openMapPicker(initial, region, onPick) {
     const api = KAKAO_READY ? kakaoPicker($('#pickmap', sh), center, initial, setPick) : svgPicker($('#pickmap', sh), center, initial, setPick);
     sh._onClose = () => api.destroy && api.destroy();
     setTimeout(() => api.resize && api.resize(), 520);
+    $('#mapGpsBtn', sh).addEventListener('click', async e => {
+      const gpsBtn = e.currentTarget;
+      gpsBtn.disabled = true;
+      try {
+        const pos = await getGpsPosition();
+        api.fly(pos.lat, pos.lng);
+        setPick(pos.lat, pos.lng);
+        toast('현재 위치로 이동했어요.');
+      } catch (ex) {
+        toast(ex.message || '현재 위치를 확인하지 못했어요.');
+      } finally { gpsBtn.disabled = false; }
+    });
     const q = $('#mapQ', sh), r = $('#mapR', sh); let qt = null;
     const show = hits => { r.innerHTML = hits.length ? hits.map((h, i) => `<button data-i="${i}">${esc(h.n)}<small>${esc(h.sub)}</small></button>`).join('') : '<button disabled>검색 결과가 없어요</button>'; r.hidden = false; r._hits = hits; };
     q.addEventListener('input', () => {
@@ -2114,6 +2302,276 @@ function svgPicker(el, center, initial, setPick) {
   return api;
 }
 
+/* 당근마켓 스타일: 내 동네 설정 & 반경 지도 시트 */
+function openRegionSheet() {
+  const me = profileOf(App.me);
+  let state = {
+    region:me.region || '마포구',
+    dong:me.dong || '',
+    loc:me.loc ? {...me.loc} : (CENT[me.region] ? {lat:CENT[me.region][0], lng:CENT[me.region][1]} : {lat:SEOUL_CENTER[0], lng:SEOUL_CENTER[1]}),
+    locVerified:!!me.locVerified,
+    rangeKm:UI.rangeKm || 0
+  };
+  const kNote = kakaoStatusNote();
+  let kMap = null, kCircle = null, kMarker = null;
+
+  openSheet({
+    title:'내 동네 설정', full:true,
+    foot:'<button class="btn btn-primary btn-block" id="rSave">이 동네로 적용하기</button>',
+    body:`<div class="region-map-box"><div id="regionMapCanvas"></div><div class="region-map-badge" id="rMapBadge">${esc(LOC.userRegionLabel ? LOC.userRegionLabel(state) : state.region)}</div></div>
+      ${kNote ? `<div class="note" style="margin:0 0 12px">${I.info}<span>${esc(kNote)}</span></div>` : ''}
+      <button type="button" class="loc-btn" id="rGpsBtn" style="margin-bottom:12px">${I.gps}<span>현재 위치로 동네 인증하기</span></button>
+      <div class="field"><div class="lbl">주변 탐색 범위 <small>선택한 거리 안의 물건만 볼 수 있어요</small></div>
+        <div class="seg in-form" id="rRange" data-seg="rRange">
+          <button type="button" data-v="2" class="${state.rangeKm === 2 ? 'on' : ''}">가까운 2km</button>
+          <button type="button" data-v="5" class="${state.rangeKm === 5 ? 'on' : ''}">주변 5km</button>
+          <button type="button" data-v="0" class="${state.rangeKm === 0 ? 'on' : ''}">전체 지역</button>
+        </div>
+      </div>
+      <div class="field"><div class="lbl">직접 동네 고르기</div>
+        <div class="region-grid" id="rGrid">${REGIONS.map(r => `<button type="button" class="chip ${state.region === r ? 'on-accent' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+      </div>`,
+    onMount(sh) {
+      const drawMap = () => {
+        const badge = $('#rMapBadge', sh);
+        const lbl = LOC.userRegionLabel ? LOC.userRegionLabel(state) : state.region;
+        badge.textContent = `${lbl}${state.locVerified ? ' · 인증됨' : ''}${state.rangeKm ? ' · 반경 ' + state.rangeKm + 'km' : ''}`;
+        const el = $('#regionMapCanvas', sh);
+        if (!el) return;
+        const lat = (state.loc && state.loc.lat) || SEOUL_CENTER[0];
+        const lng = (state.loc && state.loc.lng) || SEOUL_CENTER[1];
+        if (KAKAO_READY && window.kakao && kakao.maps) {
+          const K = kakao.maps;
+          const pos = new K.LatLng(lat, lng);
+          const lvl = state.rangeKm === 2 ? 6 : state.rangeKm === 5 ? 7 : 8;
+          if (!kMap) {
+            kMap = new K.Map(el, {center:pos, level:lvl});
+            kMarker = new K.Marker({position:pos, image:kakaoPinImage()});
+            kMarker.setMap(kMap);
+            setTimeout(() => { kMap && kMap.relayout(); kMap && kMap.setCenter(pos); }, 460);
+          } else {
+            kMap.setLevel(lvl);
+            kMap.panTo(pos);
+            kMarker.setPosition(pos);
+          }
+          if (kCircle) { kCircle.setMap(null); kCircle = null; }
+          if (state.rangeKm > 0) {
+            const acc = cssVar('--accent') || '#E8762E';
+            kCircle = new K.Circle({
+              center:pos,
+              radius:state.rangeKm * 1000,
+              strokeWeight:2,
+              strokeColor:acc,
+              strokeOpacity:0.85,
+              fillColor:acc,
+              fillOpacity:0.14
+            });
+            kCircle.setMap(kMap);
+          }
+          return;
+        }
+        // 간이 지도(SVG) + 반경 표시
+        const [px, py] = proj(lng, lat);
+        const span = state.rangeKm === 2 ? 0.06 : 0.11;
+        const w = span * COSL * 4000, h = span * 4000 * 0.65;
+        const radiusPx = state.rangeKm > 0 ? (state.rangeKm / 111) * 4000 : 0;
+        el.innerHTML = `<svg viewBox="${(px - w / 2).toFixed(1)} ${(py - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block"><g fill="var(--map-land)" stroke="var(--map-line)" stroke-width="1.2">${GEO_PATHS}</g>${radiusPx ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 3"/>` : ''}<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4.5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/></svg>`;
+      };
+
+      drawMap();
+      initSegs(sh);
+
+      $('#rRange', sh).addEventListener('click', e => {
+        const b = e.target.closest('button'); if (!b) return;
+        state.rangeKm = +b.dataset.v;
+        $$('#rRange button', sh).forEach(x => x.classList.toggle('on', x === b));
+        initSegs(sh);
+        drawMap();
+      });
+
+      $('#rGrid', sh).addEventListener('click', e => {
+        const b = e.target.closest('[data-v]'); if (!b) return;
+        state.region = b.dataset.v;
+        state.dong = '';
+        state.loc = CENT[state.region] ? {lat:CENT[state.region][0], lng:CENT[state.region][1]} : {lat:SEOUL_CENTER[0], lng:SEOUL_CENTER[1]};
+        state.locVerified = false;
+        $$('#rGrid .chip', sh).forEach(x => x.classList.toggle('on-accent', x === b));
+        drawMap();
+      });
+
+      $('#rGpsBtn', sh).addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loc-spin"></span><span>현재 위치를 확인하는 중…</span>';
+        try {
+          const res = await detectCurrentNeighborhood();
+          state.region = res.region;
+          state.dong = res.dong;
+          state.loc = {lat:res.lat, lng:res.lng};
+          state.locVerified = true;
+          $$('#rGrid .chip', sh).forEach(x => x.classList.toggle('on-accent', x.dataset.v === state.region));
+          drawMap();
+          toast(`${res.fullLabel} 인증이 완료됐어요!`);
+        } catch (ex) {
+          toast(ex.message || '현재 위치를 확인하지 못했어요.');
+        } finally {
+          if (document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = orig; }
+        }
+      });
+
+      $('#rSave', sh).addEventListener('click', async e => {
+        if (!guardWrite()) return;
+        await withLock(e.currentTarget, '저장하는 중…', async () => {
+          try {
+            await Store.patch('profiles', App.me, {
+              region:state.region,
+              dong:state.dong,
+              loc:state.loc,
+              locVerified:state.locVerified
+            });
+            UI.rangeKm = state.rangeKm;
+            if (UI.rangeKm > 0) UI.sortBy = 'distance';
+            closeSheet(sh);
+            render();
+            toast('내 동네 설정을 적용했어요.');
+          } catch (err) {}
+        });
+      });
+    }
+  });
+}
+
+/* 당근마켓 스타일: 내 주변 물건 카카오맵 보기 */
+function openNearbyMapSheet() {
+  const meCoord = myGeoCoords() || {lat:SEOUL_CENTER[0], lng:SEOUL_CENTER[1]};
+  const candidates = allItems().filter(i => i.status === 'available');
+  const entries = (LOC.filterAndSortItems
+    ? LOC.filterAndSortItems(candidates, {rangeKm:UI.rangeKm, sortBy:'distance', myCoords:meCoord, getOwner:profileOf, cent:CENT})
+    : candidates.map(item => ({item, dist:null}))
+  ).map(e => ({
+    ...e,
+    coords:LOC.itemCoords ? LOC.itemCoords(e.item, profileOf(e.item.owner), CENT) : null
+  })).filter(e => e.coords);
+
+  let selectedId = entries[0] ? entries[0].item.id : null;
+  const kNote = kakaoStatusNote(true);
+
+  openSheet({
+    title:`주변 물건 지도 (${entries.length}개)`, full:true,
+    body:'',
+    onMount(sh) {
+      const b = $('.sheet-body', sh);
+      b.style.cssText = 'padding:0;display:flex;flex-direction:column;overflow:hidden;position:relative';
+      b.innerHTML = `<div class="map-wrap" style="min-height:0">
+          <div id="nearbyMapCanvas"></div>
+          ${kNote ? `<div class="map-hint" style="top:10px;bottom:auto;max-width:calc(100% - 28px);white-space:nowrap">${esc(kNote)}</div>` : ''}
+          <button type="button" class="map-gps-btn" id="nearbyGpsBtn" aria-label="내 위치로 중심 이동" style="bottom:${selectedId ? '132px' : '98px'}">${I.gps}</button>
+          <div id="nearbyPreviewWrap"></div>
+        </div>`;
+
+      const renderPreview = () => {
+        const wrap = $('#nearbyPreviewWrap', sh);
+        const gpsBtn = $('#nearbyGpsBtn', sh);
+        const found = entries.find(e => e.item.id === selectedId);
+        if (gpsBtn) gpsBtn.style.bottom = found ? '132px' : '98px';
+        if (!found) {
+          wrap.innerHTML = `<div class="nearby-preview" style="padding:14px 16px;text-align:center"><div style="color:var(--muted);font-size:.88rem;margin-bottom:8px">현재 범위에 지도로 볼 수 있는 물건이 없어요.</div>${UI.rangeKm > 0 ? '<button type="button" class="btn btn-tint btn-sm" id="nearbyAllRange">전체 지역 물건 보기</button>' : ''}</div>`;
+          const allBtn = $('#nearbyAllRange', wrap);
+          if (allBtn) allBtn.addEventListener('click', () => { UI.rangeKm = 0; closeSheet(sh); render(); setTimeout(() => openNearbyMapSheet(), 200); });
+          return;
+        }
+        const it = found.item;
+        const p = profileOf(it.owner);
+        const distTxt = found.dist != null ? formatDist(found.dist) : '';
+        wrap.innerHTML = `<div class="nearby-preview"><button type="button" class="row" id="nearbyOpenItem" style="width:100%">
+          <div class="thumb">${itemImg(it)}</div>
+          <div class="row-body">
+            <div class="row-title">${esc(it.title)}</div>
+            <div class="row-meta">${esc(p.nickname)} · ${esc(LOC.userRegionLabel ? LOC.userRegionLabel(p) : p.region)}${distTxt ? ' · ' + esc(distTxt) : ''}</div>
+            <div class="row-value ${it.value ? 'num' : 'muted'}">${it.value ? won(it.value) : '가치 비공개'}</div>
+          </div>
+          <span class="chev" style="align-self:center;color:var(--muted)">${I.chev}</span>
+        </button></div>`;
+        $('#nearbyOpenItem', wrap).addEventListener('click', () => {
+          closeSheet(sh);
+          setTimeout(() => pushPage({type:'item', id:it.id}), 180);
+        });
+      };
+
+      const canvas = $('#nearbyMapCanvas', sh);
+      let kMap = null;
+      const pinEls = new Map();
+
+      const highlightPin = id => {
+        selectedId = id;
+        for (const [pid, el] of pinEls.entries()) el.classList.toggle('on', pid === id);
+        if (!KAKAO_READY) drawSvg(curCenter.lat, curCenter.lng);
+        renderPreview();
+      };
+
+      let curCenter = {lat:meCoord.lat, lng:meCoord.lng};
+      const drawSvg = (cLat, cLng) => {
+        curCenter = {lat:cLat, lng:cLng};
+        const [cx, cy] = proj(cLng, cLat);
+        const span = 0.085, w = span * COSL * 4000, h = span * 4000 * 1.15;
+        const svgMarks = entries.map(({item, coords}) => {
+          const [ix, iy] = proj(coords.lng, coords.lat);
+          return `<g class="svg-item-pin" data-item-pin="${item.id}" style="cursor:pointer"><circle cx="${ix.toFixed(1)}" cy="${iy.toFixed(1)}" r="4.8" fill="${item.id === selectedId ? 'var(--accent)' : 'var(--contrast)'}" stroke="#fff" stroke-width="1.4"/><text x="${ix.toFixed(1)}" y="${(iy - 7).toFixed(1)}" text-anchor="middle" font-size="4.6" font-weight="700" fill="var(--text)">${esc(item.title.slice(0, 8))}</text></g>`;
+        }).join('');
+        canvas.innerHTML = `<svg viewBox="${(cx - w / 2).toFixed(1)} ${(cy - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block"><g fill="var(--map-land)" stroke="var(--map-line)" stroke-width=".9">${GEO_PATHS}</g><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--good)" stroke="#fff" stroke-width="1.4"/>${svgMarks}</svg>`;
+      };
+
+      if (KAKAO_READY && window.kakao && kakao.maps) {
+        const K = kakao.maps;
+        const centerPos = new K.LatLng(meCoord.lat, meCoord.lng);
+        kMap = new K.Map(canvas, {center:centerPos, level:UI.rangeKm === 2 ? 5 : 6});
+        kMap.addControl(new K.ZoomControl(), K.ControlPosition.RIGHT);
+        if (UI.rangeKm > 0) {
+          const acc = cssVar('--accent') || '#E8762E';
+          new K.Circle({center:centerPos, radius:UI.rangeKm * 1000, strokeWeight:2, strokeColor:acc, strokeOpacity:.8, fillColor:acc, fillOpacity:.1}).setMap(kMap);
+        }
+        entries.forEach(({item, coords}) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `nearby-pin ${item.id === selectedId ? 'on' : ''}`;
+          btn.textContent = item.value ? won(item.value) : item.title.slice(0, 7);
+          btn.addEventListener('click', e => {
+            e.stopPropagation();
+            highlightPin(item.id);
+            kMap.panTo(new K.LatLng(coords.lat, coords.lng));
+          });
+          pinEls.set(item.id, btn);
+          new K.CustomOverlay({position:new K.LatLng(coords.lat, coords.lng), content:btn, yAnchor:1.2}).setMap(kMap);
+        });
+        setTimeout(() => { kMap && kMap.relayout(); kMap && kMap.setCenter(centerPos); }, 460);
+      } else {
+        drawSvg(meCoord.lat, meCoord.lng);
+        canvas.addEventListener('click', e => {
+          const g = e.target.closest('[data-item-pin]');
+          if (!g) return;
+          highlightPin(g.dataset.itemPin);
+        });
+      }
+
+      renderPreview();
+
+      $('#nearbyGpsBtn', sh).addEventListener('click', async e => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        try {
+          const pos = await getGpsPosition();
+          if (kMap && window.kakao) kMap.panTo(new kakao.maps.LatLng(pos.lat, pos.lng));
+          else drawSvg(pos.lat, pos.lng);
+          toast('현재 위치로 지도를 옮겼어요.');
+        } catch (ex) {
+          toast(ex.message || '현재 위치를 확인하지 못했어요.');
+        } finally { btn.disabled = false; }
+      });
+    }
+  });
+}
+
 /* ============ 찾는 것 ============ */
 function openWantsSheet() {
   let wants = [...wantsOf(App.me)]; let mode = 'cat'; let top = 1;
@@ -2121,7 +2579,7 @@ function openWantsSheet() {
     const draw = () => {
       $('.sheet-body', sh).innerHTML = `<p style="margin:0 4px 16px;color:var(--muted);font-size:.94rem">등록한 것과 맞는 물건이 홈의 추천 매칭에 떠요. 최대 5개까지 등록할 수 있어요.</p>
         <div class="field"><div class="lbl">등록한 항목 <small class="num">${wants.length}/5</small></div><div class="chips wrap">${wants.length ? wants.map((w, i) => `<button type="button" class="chip on" data-rm="${i}" aria-label="${esc(wantLabel(w))} 삭제">${esc(wantLabel(w))}<span class="x">${I.close.replace('<svg', '<svg style="width:12px;height:12px"')}</span></button>`).join('') : '<span class="hint" style="margin:0">아직 없어요</span>'}</div></div>
-        <div class="seg in-form" id="wMode" style="margin-bottom:16px"><button type="button" data-v="cat" class="${mode === 'cat' ? 'on' : ''}">카테고리로</button><button type="button" data-v="kw" class="${mode === 'kw' ? 'on' : ''}">키워드로</button></div>
+        <div class="seg in-form" id="wMode" data-seg="wMode" style="margin-bottom:16px"><button type="button" data-v="cat" class="${mode === 'cat' ? 'on' : ''}">카테고리로</button><button type="button" data-v="kw" class="${mode === 'kw' ? 'on' : ''}">키워드로</button></div>
         ${mode === 'cat' ? `<div class="chips wrap" id="wTop" style="margin-bottom:10px">${CATS.map(c => `<button type="button" class="chip ${top === c.id ? 'on' : ''}" data-top="${c.id}">${c.n}</button>`).join('')}</div><div class="chips wrap" id="wSub"><button type="button" class="chip" data-add="${top}">${CAT_NAME[top]} 전체</button>${CATS.find(c => c.id === top).subs.map(([id, n]) => `<button type="button" class="chip ${wants.some(w => w.t === 'cat' && w.c === id) ? 'on-accent' : ''}" data-add="${id}">${n}</button>`).join('')}</div>`
         : `<div style="display:flex;gap:8px"><input class="input" id="wKw" maxlength="20" placeholder="예: 아이브 안유진 포카" aria-label="찾는 키워드 입력"><button type="button" class="btn btn-tint" id="wKwAdd" style="flex:none">추가</button></div><div class="hint">물건 제목에 이 단어가 들어가면 매칭돼요.</div>`}`;
       initSegs(sh);
@@ -2145,15 +2603,33 @@ function openWantsSheet() {
 
 /* ============ 프로필 · 비밀번호 변경 · 회원 탈퇴 ============ */
 function openProfileSheet() {
-  const p = profileOf(App.me); let region = p.region;
-  openSheet({title:'프로필 수정', full:true, foot:'<button class="btn btn-primary btn-block" id="pSave">저장하기</button>', body:`<div class="field"><label for="pNick">닉네임</label><input class="input" id="pNick" maxlength="10" value="${esc(p.nickname)}"><div class="hint" id="pHint"></div></div><div class="field"><div class="lbl">내 동네</div><div class="region-grid" id="pRegion">${REGIONS.map(r => `<button type="button" class="chip ${region === r ? 'on-accent' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`, onMount(sh) {
-    $('#pRegion', sh).addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; region = b.dataset.v; $$('#pRegion .chip', sh).forEach(x => x.classList.toggle('on-accent', x === b)); });
+  const p = profileOf(App.me);
+  let region = p.region, dong = p.dong || '', loc = p.loc || null, locVerified = !!p.locVerified;
+  openSheet({title:'프로필 수정', full:true, foot:'<button class="btn btn-primary btn-block" id="pSave">저장하기</button>', body:`<div class="field"><label for="pNick">닉네임</label><input class="input" id="pNick" maxlength="10" value="${esc(p.nickname)}"><div class="hint" id="pHint"></div></div><div class="field"><div class="lbl">내 동네</div><button type="button" class="loc-btn" id="pGpsBtn" style="margin-bottom:10px">${I.gps}<span>현재 위치로 내 동네 찾기</span></button><div id="pGpsStatus" style="margin-bottom:10px">${locVerified && region ? `<div class="loc-verified">${I.check}<span>${esc(dong ? `${region} · ${dong}` : region)} 확인됨</span></div>` : ''}</div><div class="region-grid" id="pRegion">${REGIONS.map(r => `<button type="button" class="chip ${region === r ? 'on-accent' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`, onMount(sh) {
+    $('#pRegion', sh).addEventListener('click', e => {
+      const b = e.target.closest('[data-v]'); if (!b) return;
+      region = b.dataset.v; dong = ''; loc = CENT[region] ? {lat:CENT[region][0], lng:CENT[region][1]} : null; locVerified = false;
+      $$('#pRegion .chip', sh).forEach(x => x.classList.toggle('on-accent', x === b));
+      $('#pGpsStatus', sh).innerHTML = '';
+    });
+    $('#pGpsBtn', sh).addEventListener('click', async e => {
+      const btn = e.currentTarget, orig = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<span class="loc-spin"></span><span>현재 위치를 확인하는 중…</span>';
+      try {
+        const res = await detectCurrentNeighborhood();
+        region = res.region; dong = res.dong; loc = {lat:res.lat, lng:res.lng}; locVerified = true;
+        $$('#pRegion .chip', sh).forEach(x => x.classList.toggle('on-accent', x.dataset.v === region));
+        $('#pGpsStatus', sh).innerHTML = `<div class="loc-verified">${I.check}<span>${esc(res.fullLabel)} 확인됨</span></div>`;
+        toast(`${res.fullLabel}으로 설정했어요!`);
+      } catch (ex) { toast(ex.message || '현재 위치를 확인하지 못했어요.'); }
+      finally { if (document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = orig; } }
+    });
     $('#pSave', sh).addEventListener('click', async e => {
       if (!guardWrite()) return;
       const n = $('#pNick', sh).value.trim(); const err = validNick(n, App.me);
       if (err) { $('#pHint', sh).textContent = err; $('#pHint', sh).classList.add('err'); return; }
       await withLock(e.currentTarget, '저장하는 중…', async () => {
-        try { await Store.patch('profiles', App.me, {nickname:n, region}); closeSheet(sh); toast('프로필을 저장했어요.'); } catch (er) {}
+        try { await Store.patch('profiles', App.me, {nickname:n, region, dong, loc, locVerified}); closeSheet(sh); toast('프로필을 저장했어요.'); } catch (er) {}
       });
     });
   }});
@@ -2508,7 +2984,7 @@ async function boot() {
   if (ld) ld.innerHTML = skeletonListHtml(4);
 
   const params = new URLSearchParams(location.search);
-  if (!sb && AUTOSTART) {
+  if (AUTOSTART) {
     initDemoData();
     if (ld) ld.remove();
     if (params.get('recovery') === '1') App.recovery = true;

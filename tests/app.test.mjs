@@ -77,13 +77,15 @@ function loadBaggullaeVm() {
   sandbox.window = sandbox;
 
   const geoCode = fs.readFileSync(path.resolve('src/geo.js'), 'utf8');
+  const locCode = fs.readFileSync(path.resolve('src/location.js'), 'utf8');
   const appCode = fs.readFileSync(path.resolve('src/app.js'), 'utf8');
   vm.createContext(sandbox);
   vm.runInContext(geoCode, sandbox, { filename: 'src/geo.js' });
+  vm.runInContext(locCode, sandbox, { filename: 'src/location.js' });
   vm.runInContext(appCode, sandbox, { filename: 'src/app.js' });
   // Expose top-level lexical bindings (const/let) via helper eval inside context
   return vm.runInContext(
-    '({ S, App, detectPrivateInfo, validNick, krError, normalizeSupabaseUrl, evalPasswordSecurity, offerById, chatMessagesOf, hasChatRoom, chatWriteState, canWriteChat, unreadChatCount, unreadNotifCount, myChatRooms, onboardingProgress, homeGreeting, tempOf, matchFeed, extractStoragePath, initDemoData, CHAT_GRACE_MS })',
+    '({ S, App, CENT, STATIONS, GEO, REGIONS, LOC, detectPrivateInfo, validNick, krError, normalizeSupabaseUrl, evalPasswordSecurity, offerById, chatMessagesOf, hasChatRoom, chatWriteState, canWriteChat, unreadChatCount, unreadNotifCount, myChatRooms, onboardingProgress, homeGreeting, tempOf, matchFeed, extractStoragePath, initDemoData, CHAT_GRACE_MS })',
     sandbox
   );
 }
@@ -228,5 +230,56 @@ describe('바꿀래 핵심 로직 단위 테스트', () => {
     assert.equal(strong.level, 4);
     assert.equal(strong.rules.special, true);
     assert.equal(strong.match, 'match');
+  });
+
+  it('LOC: 거리 포맷, 좌표 반올림, 동네 라벨을 정확히 계산한다', () => {
+    const LOC = ctx.LOC;
+    assert.equal(LOC.roundPublicCoord(37.556349), 37.556);
+    assert.equal(LOC.formatDistance(45), '100m 이내');
+    assert.equal(LOC.formatDistance(640), '650m');
+    assert.equal(LOC.formatDistance(1480), '1.5km');
+    assert.equal(LOC.userRegionLabel({ region: '마포구', dong: '서교동' }), '마포구 · 서교동');
+    assert.equal(LOC.userRegionLabel({ region: '마포구', dong: '서교동' }, true), '서교동');
+    assert.equal(LOC.userRegionLabel({ region: '그 외 지역', dong: '부산 해운대구' }), '부산 해운대구');
+  });
+
+  it('LOC.parseKakaoRegionResult: 카카오 coord2RegionCode 결과를 서울 구/경기/인천/기타로 매핑한다', () => {
+    const LOC = ctx.LOC;
+    const seoulRes = {...LOC.parseKakaoRegionResult([
+      { region_type: 'B', region_1depth_name: '서울특별시', region_2depth_name: '마포구', region_3depth_name: '서교동' },
+      { region_type: 'H', region_1depth_name: '서울특별시', region_2depth_name: '마포구', region_3depth_name: '서교동' },
+    ], ctx.REGIONS)};
+    assert.deepEqual(seoulRes, { region: '마포구', dong: '서교동', fullLabel: '마포구 서교동' });
+
+    const ggRes = {...LOC.parseKakaoRegionResult([
+      { region_type: 'H', region_1depth_name: '경기도', region_2depth_name: '성남시 분당구', region_3depth_name: '정자동' },
+    ], ctx.REGIONS)};
+    assert.deepEqual(ggRes, { region: '경기도', dong: '성남시 분당구 정자동', fullLabel: '경기도 성남시 분당구 정자동' });
+
+    const icRes = {...LOC.parseKakaoRegionResult([
+      { region_type: 'H', region_1depth_name: '인천광역시', region_2depth_name: '연수구', region_3depth_name: '송도동' },
+    ], ctx.REGIONS)};
+    assert.deepEqual(icRes, { region: '인천', dong: '연수구 송도동', fullLabel: '인천 연수구 송도동' });
+  });
+
+  it('LOC.nearestRegionAndStation & filterAndSortItems: GPS 폴백과 반경·가까운순 필터가 동작한다', () => {
+    const LOC = ctx.LOC;
+    // 홍대입구역 좌표
+    const fb = LOC.nearestRegionAndStation(37.5563, 126.9236, ctx.CENT, ctx.STATIONS, ctx.GEO, ctx.REGIONS);
+    assert.equal(fb.region, '마포구');
+    assert.equal(fb.nearestStation, '홍대입구역');
+    assert.match(fb.dong, /홍대입구역/);
+
+    const myCoords = { lat: 37.5563, lng: 126.9236 };
+    const items = [
+      { id: 'near', owner: 'u1', region: '마포구', meet: { lat: 37.557, lng: 126.924 }, createdAt: 100 },
+      { id: 'mid', owner: 'u2', region: '용산구', meet: { lat: 37.530, lng: 126.964 }, createdAt: 300 },
+      { id: 'far', owner: 'u3', region: '송파구', meet: { lat: 37.513, lng: 127.100 }, createdAt: 200 },
+    ];
+    const sorted = LOC.filterAndSortItems(items, { rangeKm: 0, sortBy: 'distance', myCoords, cent: ctx.CENT });
+    assert.deepEqual(sorted.map(x => x.item.id), ['near', 'mid', 'far']);
+
+    const within2km = LOC.filterAndSortItems(items, { rangeKm: 2, sortBy: 'recent', myCoords, cent: ctx.CENT });
+    assert.deepEqual(within2km.map(x => x.item.id), ['near']);
   });
 });

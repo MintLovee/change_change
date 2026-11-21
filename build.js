@@ -51,6 +51,7 @@ const hashOf = file => {
 const ASSET_VER = {
   'style.css': hashOf('style.css'),
   'geo.js': hashOf('geo.js'),
+  'location.js': hashOf('location.js'),
   'app.js': hashOf('app.js')
 };
 fs.rmSync(dist, {recursive:true, force:true});
