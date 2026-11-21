@@ -1468,6 +1468,7 @@ function validNick(v, self) {
 const ACT = {
   tab(d) { if (UI.tab !== d.tab) { UI.tab = d.tab; UI.enterTab = true; } render(); },
   tabFromPage(d) { while (UI.stack.length) popPage(); UI.tab = d.tab; UI.enterTab = true; render(); },
+  startDemo() { const a = $('#stage > .auth'); if (a) a.remove(); initDemoData(); render(); },
   browseAll() { while (UI.stack.length) popPage(); UI.tab = 'home'; UI.homeSeg = 'all'; UI.enterTab = true; render(); },
   resetFilter() { UI.filterCat = 0; UI.filterMethod = ''; render(); },
   back() { popPage(); },
@@ -2368,7 +2369,7 @@ async function boot() {
 
   if (!sb) {
     if (ld) ld.remove();
-    $('#stage').insertAdjacentHTML('beforeend', `<div class="auth"><div class="auth-hero"><div class="logo">${I.swap}</div><h1>설정이 필요해요</h1><p class="lead" style="margin:0">Supabase 주소와 anon 키가 페이지에 들어가지 않았어요. GitHub 저장소의 Secrets에 SUPABASE_URL, SUPABASE_ANON_KEY를 넣고 다시 배포해 주세요.</p></div></div>`);
+    $('#stage').insertAdjacentHTML('beforeend', `<div class="auth"><div class="auth-hero"><div class="logo">${I.swap}</div><h1>설정이 필요해요</h1><p class="lead" style="margin:0">현재 페이지에는 Supabase 키가 들어가 있지 않아요. GitHub 저장소의 Secrets에 SUPABASE_URL, SUPABASE_ANON_KEY를 넣으셨다면 <b>main</b>에 push하거나 GitHub <b>Actions → GitHub Pages 배포</b>를 실행해 배포 주소에서 열어 주세요.</p></div><div class="auth-actions"><button class="btn btn-primary btn-block" data-act="startDemo">데모 데이터로 먼저 둘러보기</button></div><div class="auth-foot">실제 회원가입과 데이터 저장은 GitHub Pages 배포 주소 또는 .env 빌드에서 동작해요.</div></div>`);
     return;
   }
 

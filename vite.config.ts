@@ -9,6 +9,16 @@ export default defineConfig(() => {
     plugins: [
       react(),
       tailwindcss(),
+      {
+        name: 'inject-preview-env',
+        transformIndexHtml(html: string): string {
+          const sbUrl = (process.env.SUPABASE_URL || '').trim();
+          const sbKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+          if (sbUrl) html = html.split('{{SUPABASE_URL}}').join(sbUrl);
+          if (sbKey) html = html.split('{{SUPABASE_ANON_KEY}}').join(sbKey);
+          return html;
+        },
+      },
       // Copies src/assets into dist/ so root-relative URLs like
       // "/src/assets/images/..." (e.g. generate_image output) still resolve
       // in production builds. Do not remove.
