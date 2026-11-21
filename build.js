@@ -5,9 +5,12 @@
  *   node build.js --serve   → dist/ 만든 뒤 http://localhost:3000 에서 미리보기
  * 로컬에서는 .env 파일 값을 읽어요. (.env는 저장소에 올라가지 않아요)
  */
-const fs = require('fs');
-const path = require('path');
-const http = require('http');
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const envFile = path.join(__dirname, '.env');
 if (fs.existsSync(envFile)) {
@@ -28,9 +31,11 @@ if (!/^[A-Za-z0-9]+$/.test(val('KAKAO_JS_KEY') || 'x')) { console.error('[바꿀
 if (!/^https:\/\/[^"'<>\s]+$/.test(val('SUPABASE_URL')) || /["'<>\s]/.test(val('SUPABASE_ANON_KEY'))) { console.error('[바꿀래] SUPABASE_URL 또는 SUPABASE_ANON_KEY 형식이 이상해요.'); process.exit(1); }
 
 const src = path.join(__dirname, 'src'), dist = path.join(__dirname, 'dist');
+const SKIP_FILES = new Set(['App.tsx', 'main.tsx', 'index.css']);
 fs.rmSync(dist, {recursive:true, force:true});
 fs.mkdirSync(dist, {recursive:true});
 for (const f of fs.readdirSync(src)) {
+  if (SKIP_FILES.has(f)) continue;
   const full = path.join(src, f);
   if (fs.statSync(full).isDirectory()) continue;
   let txt = fs.readFileSync(full, 'utf8');
