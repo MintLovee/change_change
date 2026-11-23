@@ -1,7 +1,7 @@
 -- =====================================================================
 -- 바꿀래 시연용 목업 & 데모 계정 통합 시드 (Supabase SQL Editor에서 실행)
 --
--- 사전 준비: 먼저 supabase/schema.sql 을 한 번 실행해 테이블과 함수를 만들어 주세요.
+-- 사전 준비: 먼저 최신 supabase/schema.sql 을 실행해 테이블과 보안 정책/함수를 만들어 주세요.
 -- 여러 번 실행해도 안전하도록 기존 시드/데모 데이터를 정리한 뒤 다시 넣어요.
 --
 -- [포함된 데이터]
@@ -20,11 +20,11 @@
 set search_path = public, auth, extensions;
 
 -- 1. 기존 예시·목업·데모 데이터 정리 (재실행 시 충돌 방지)
-delete from notifications where id like 'mock-%' or id like 'nt_%' and recipient in (
+delete from notifications where id like 'mock-%' or (id like 'nt_%' and recipient in (
   'a1000000-0000-4000-8000-000000000001',
   'a1000000-0000-4000-8000-000000000002',
   'a1000000-0000-4000-8000-000000000003'
-);
+));
 delete from messages where id like 'ex-%' or id like 'mock-%';
 delete from favorites where id like 'ex-%' or id like 'a1000000-0000-4000-8000-00000000000%';
 delete from reviews where id like 'ex-%' or id like 'mock-%';

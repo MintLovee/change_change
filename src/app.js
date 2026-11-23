@@ -328,12 +328,16 @@ function krError(e) {
     return '이미 저장된 정보예요. 새로고침한 뒤 다시 확인해 주세요.';
   }
   if (code === '23514') return '입력한 내용의 형식이 맞지 않아요. 내용을 다시 확인해 주세요.';
+  if (code === '42P17' || /infinite recursion/i.test(m)) {
+    return '채팅 보안 정책을 업데이트해야 해요. Supabase SQL Editor에서 최신 schema.sql을 다시 실행한 뒤 시도해 주세요.';
+  }
   if (code === 'PGRST202' || code === '42883' || /Could not find the function/i.test(m)) {
     return '데이터베이스 함수가 아직 적용되지 않았어요. Supabase SQL Editor에서 최신 schema.sql을 실행한 뒤 새로고침해 주세요.';
   }
-  if (code === 'PGRST205' || code === '42P01' || /Could not find the table/i.test(m)) {
-    return '데이터베이스 테이블이 아직 준비되지 않았어요. Supabase SQL Editor에서 schema.sql을 실행해 주세요.';
+  if (code === 'PGRST205' || code === 'PGRST204' || code === '42P01' || code === '42703' || /Could not find the (table|column)/i.test(m)) {
+    return '데이터베이스 스키마가 아직 최신 버전이 아니에요. Supabase SQL Editor에서 최신 schema.sql을 실행해 주세요.';
   }
+  if (code === '22P02') return '입력 값 형식이 올바르지 않아요. 다시 확인해 주세요.';
   if (code === '42501') {
     if (/permission denied for table/i.test(m)) return '데이터베이스 테이블 권한이 설정되지 않았어요. Supabase SQL Editor에서 schema.sql을 다시 실행해 주세요.';
     return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
@@ -437,14 +441,27 @@ async function enterSession(user) {
   App.me = user.id; App.email = user.email || ''; App.session = true;
   await loadState(); connectLive();
 }
+function clearAppShellDom({keepAuth = false} = {}) {
+  const main = $('#main');
+  if (main) { main.innerHTML = ''; main.className = ''; main.style.transform = ''; main.style.filter = ''; }
+  const pages = $('#pages');
+  if (pages) pages.innerHTML = '';
+  const scrim = $('#pageScrim');
+  if (scrim) scrim.classList.remove('in');
+  const sbEl = $('#sidebar'); if (sbEl) sbEl.classList.add('hidden');
+  const fabEl = $('#fab'); if (fabEl) fabEl.classList.add('hidden');
+  const tbEl = $('#tabbar'); if (tbEl) tbEl.classList.add('hidden');
+  $$('.sheet, .backdrop, .dialog, .viewer').forEach(el => el.remove());
+  if (!keepAuth) { const a = $('#auth'); if (a) a.remove(); }
+}
 async function signOut() { if (!App.demo && sb) { try { await sb.auth.signOut(); } catch (e) {} } signOutLocal(); }
 function signOutLocal() {
   flushPendingOps();
   if (App.ch && sb) { sb.removeChannel(App.ch); App.ch = null; }
-  App.session = false; App.me = null; App.recovery = false; Object.keys(S).forEach(c => { S[c] = {}; });
-  while (UI.stack.length) popPage();
-  $$('.sheet').forEach(sh => closeSheet(sh, {force:true}));
-  const a = $('#auth'); if (a) a.remove();
+  App.session = false; App.me = null; App.recovery = false; App._safetySeen = false;
+  Object.keys(S).forEach(c => { S[c] = {}; });
+  UI.stack = []; UI.tab = 'home'; UI.renderedTab = 'home'; UI.enterTab = true; UI.scroll = {};
+  clearAppShellDom();
   OB.step = 0; OB.nickname = ''; OB.sido = '서울특별시'; OB.region = ''; OB.dong = ''; OB.loc = null; OB.locVerified = false; OB.wants = []; OB.agree = [false, false, false];
   render();
 }
@@ -683,10 +700,10 @@ function renderSidebar(totalOfferBadge) {
 
 function render() {
   if (App.loading) return;
-  if (App.recovery) { renderNewPassword(); return; }
-  if (!App.session) { $('#sidebar').classList.add('hidden'); renderAuth(); return; }
+  if (App.recovery) { clearAppShellDom({keepAuth:true}); renderNewPassword(); return; }
+  if (!App.session) { clearAppShellDom({keepAuth:true}); renderAuth(); return; }
   if (!S.profiles[App.me]) {
-    $('#sidebar').classList.add('hidden');
+    clearAppShellDom({keepAuth:true});
     const a = $('#auth'); if (!a || a.dataset.mode !== 'onboard') { renderAuth(); OB.step = 0; renderOnboard(); }
     return;
   }
@@ -712,6 +729,7 @@ function render() {
   syncNavBadges();
   $('#fab').classList.toggle('hidden', UI.tab !== 'home' || UI.stack.length > 0);
   $('#tabbar').classList.toggle('hidden', UI.stack.length > 0);
+  const scrim = $('#pageScrim'); if (scrim) scrim.classList.toggle('in', UI.stack.length > 0);
   UI.stack.forEach(p => renderPage(p));
 }
 
@@ -1020,6 +1038,7 @@ function pushPage(p) {
   renderPage(p, true);
   bindEdgeSwipe(el);
   $('#main').classList.add('under', 'pushed');
+  const scrim = $('#pageScrim'); if (scrim) scrim.classList.add('in');
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in')));
   if (p.type === 'challenge') try { history.replaceState(null, '', '#challenge-' + p.id); } catch (e) {}
   $('#fab').classList.add('hidden'); $('#tabbar').classList.add('hidden');
@@ -1028,7 +1047,11 @@ function popPage() {
   const p = UI.stack.pop(); if (!p) return;
   const el = $(`.page[data-key="${p.key}"]`);
   if (el) { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 480); }
-  if (!UI.stack.length) { $('#main').classList.remove('pushed'); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
+  if (!UI.stack.length) {
+    $('#main').classList.remove('pushed');
+    const scrim = $('#pageScrim'); if (scrim) scrim.classList.remove('in');
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  }
   scheduleRender();
 }
 function bindEdgeSwipe(pageEl) {
@@ -1083,7 +1106,12 @@ function renderPage(p, first) {
   const out = fn(p.id);
   if (out == null) { el.innerHTML = navBar('', {back:true}) + emptyBox('info', '찾을 수 없어요', '삭제되었거나 아직 불러오는 중이에요.', '<button class="btn btn-tint btn-sm" data-act="back">돌아가기</button>'); return; }
   el.innerHTML = out;
-  const v = $('.view', el); if (v) { v.scrollTop = first ? 0 : st; bindScroll(v); initSegs(v); bindGallery(v); }
+  const v = $('.view', el);
+  if (v) {
+    if (first) v.classList.add('page-enter');
+    v.scrollTop = first ? 0 : st;
+    bindScroll(v); initSegs(v); bindGallery(v);
+  }
 }
 
 function bindGallery(root) {
@@ -1167,7 +1195,8 @@ function renderChatPage(el, p, first) {
   };
 
   if (!first && msgListEl && el.dataset.offerStatus === `${o.status}_${writable}`) {
-    const atBottom = (msgListEl.scrollHeight - msgListEl.scrollTop - msgListEl.clientHeight) < 80;
+    const atBottom = p._forceScrollBottom || (msgListEl.scrollHeight - msgListEl.scrollTop - msgListEl.clientHeight) < 80;
+    p._forceScrollBottom = false;
     msgListEl.innerHTML = buildMessagesHtml();
     if (atBottom) msgListEl.scrollTop = msgListEl.scrollHeight;
     return;
@@ -1251,9 +1280,12 @@ function renderChatPage(el, p, first) {
       }
       const msgData = {offer:o.id, sender:App.me, receiver:other, text, at:now(), readAt:null};
       if (photoUrl) msgData.photo = photoUrl;
+      p._forceScrollBottom = true;
       await Store.set('messages', msgId, msgData);
       requestAnimationFrame(() => { if (sc) sc.scrollTop = sc.scrollHeight; });
+      if (document.body.contains(inp)) inp.focus();
     } catch (e) {
+      p._forceScrollBottom = false;
       if (text && !inp.value) inp.value = text;
       syncSend();
       if (!e || !e._handled) handleWriteError(e);
@@ -1432,6 +1464,8 @@ async function closeSheet(sh, {force = false} = {}) {
     if (!ok) return;
   }
   sh._closing = true;
+  sh.style.pointerEvents = 'none';
+  if (sh._bd) sh._bd.style.pointerEvents = 'none';
   sh.classList.remove('in'); sh._bd.classList.remove('in');
   if (sh._onClose) sh._onClose();
   setTimeout(() => { sh.remove(); sh._bd.remove(); }, 450);
@@ -1443,7 +1477,8 @@ function confirmDialog(title, msg, okLabel = '확인', danger = false) {
     d.innerHTML = `<div class="dt">${esc(title)}</div>${msg ? `<div class="dm">${esc(msg)}</div>` : ''}<div class="da"><button data-r="0">취소</button><button data-r="1" class="strong ${danger ? 'danger' : ''}">${esc(okLabel)}</button></div>`;
     $('#stage').append(bd, d);
     requestAnimationFrame(() => { bd.classList.add('in'); d.classList.add('in'); });
-    const done = v => { d.classList.remove('in'); bd.classList.remove('in'); setTimeout(() => { d.remove(); bd.remove(); }, 300); res(v); };
+    let settled = false;
+    const done = v => { if (settled) return; settled = true; d.classList.remove('in'); bd.classList.remove('in'); setTimeout(() => { d.remove(); bd.remove(); }, 300); res(v); };
     d.addEventListener('click', e => { const b = e.target.closest('button'); if (b) done(b.dataset.r === '1'); });
     bd.addEventListener('click', () => done(false));
     setTimeout(() => $('button.strong', d).focus(), 50);
@@ -1776,10 +1811,20 @@ function renderNewPassword() {
 
 /* ============ 액션 ============ */
 const ACT = {
-  tab(d) { if (UI.tab !== d.tab) { UI.tab = d.tab; UI.enterTab = true; } render(); },
-  tabFromPage(d) { while (UI.stack.length) popPage(); UI.tab = d.tab; UI.enterTab = true; render(); },
+  tab(d) {
+    const hadStack = UI.stack.length > 0;
+    while (UI.stack.length) popPage();
+    $$('.sheet').forEach(sh => closeSheet(sh, {force:true}));
+    $$('.viewer').forEach(v => v.remove());
+    if (UI.tab !== d.tab || hadStack) {
+      if (UI.tab !== d.tab) UI.enterTab = true;
+      UI.tab = d.tab;
+    }
+    render();
+  },
+  tabFromPage(d) { this.tab(d); },
   startDemo() { const a = $('#stage > .auth'); if (a) a.remove(); initDemoData(); render(); },
-  browseAll() { while (UI.stack.length) popPage(); UI.tab = 'home'; UI.homeSeg = 'all'; UI.enterTab = true; render(); },
+  browseAll() { while (UI.stack.length) popPage(); $$('.sheet').forEach(sh => closeSheet(sh, {force:true})); UI.tab = 'home'; UI.homeSeg = 'all'; UI.enterTab = true; render(); },
   resetFilter() { UI.filterCat = 0; UI.filterMethod = ''; UI.rangeKm = 0; UI.sortBy = 'recent'; render(); },
   back() { popPage(); },
   closeSheet(d, el) { closeSheet(el.closest('.sheet')); },
@@ -1811,7 +1856,12 @@ const ACT = {
       toast('찜 목록에 저장했어요.');
     }
   },
-  newItem() { if (guardWrite()) openItemForm(); },
+  newItem() {
+    if (!guardWrite()) return;
+    if ($('#fSave')) return;
+    $$('.sheet').forEach(sh => closeSheet(sh, {force:true}));
+    openItemForm();
+  },
   editItem(d) { openItemForm(itemById(d.id)); },
   openWants() { openWantsSheet(); },
   editProfile() { openProfileSheet(); },
@@ -1957,6 +2007,7 @@ const ACT = {
   }
 };
 document.addEventListener('click', e => {
+  if (e.target.id === 'pageScrim') { popPage(); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   const fn = ACT[el.dataset.act]; if (!fn) return;
   e.preventDefault(); fn(el.dataset, el);
@@ -3172,6 +3223,14 @@ async function boot() {
   const m = location.hash.match(/^#challenge-([A-Za-z0-9_-]+)$/);
   if (m && S.challenges[m[1]] && App.session && S.profiles[App.me]) pushPage({type:'challenge', id:m[1]});
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { const sh = $$('.sheet').pop(); if (sh) closeSheet(sh); else if (UI.stack.length) popPage(); } });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if ($('.viewer')) return;
+  const dlg = $$('.dialog').pop();
+  if (dlg) { const cancel = $('button[data-r="0"]', dlg); if (cancel) cancel.click(); return; }
+  const sh = $$('.sheet').pop();
+  if (sh) { closeSheet(sh); return; }
+  if (UI.stack.length) popPage();
+});
 setInterval(() => { if (!$('.sheet') && !$('.dialog') && App.session && S.profiles[App.me]) scheduleRender(); }, 60000);
 boot();

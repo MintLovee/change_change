@@ -148,6 +148,31 @@ create policy "favorites delete own" on favorites for delete to authenticated us
 
 -- 채팅 메시지: 당사자만 읽고 쓸 수 있고, 보낸 사람은 auth.uid()로 강제해요.
 -- 교환 완료나 거절/취소 이후 7일(604,800,000ms)이 지나면 새 메시지를 쓸 수 없어요(읽기 전용).
+-- (RLS 정책 안에서 messages 테이블을 직접 다시 조회하면 Postgres 42P17 무한 재귀 오류가 나므로 SECURITY DEFINER 함수로 판별해요.)
+create or replace function can_write_chat_message(p_offer text, p_sender text, p_receiver text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from offers o
+    where o.id = p_offer
+      and p_sender = auth.uid()::text
+      and (
+        (o.from_user = p_sender and o.to_user = p_receiver)
+        or (o.to_user = p_sender and o.from_user = p_receiver)
+      )
+      and (
+        o.status = 'accepted'
+        or (
+          o.status in ('completed', 'rejected', 'cancelled')
+          and (o.status = 'completed' or o.data ? 'acceptedAt' or exists (select 1 from messages m2 where m2.offer_id = o.id))
+          and (now_ms() - coalesce((o.data->>'completedAt')::bigint, (o.data->>'updatedAt')::bigint, (o.data->>'createdAt')::bigint)) <= 604800000
+        )
+      )
+  );
+$$;
+
+revoke all on function can_write_chat_message(text, text, text) from public, anon;
+grant execute on function can_write_chat_message(text, text, text) to authenticated;
+
 create policy "messages read parties" on messages for select to authenticated
   using (
     auth.uid()::text in (sender, receiver)
@@ -158,22 +183,7 @@ create policy "messages insert parties" on messages for insert to authenticated
   with check (
     sender = auth.uid()::text
     and (coalesce(length(trim(data->>'text')), 0) > 0 or coalesce(data->>'photo', '') <> '')
-    and exists (
-      select 1 from offers o
-      where o.id = messages.offer_id
-        and (
-          (o.from_user = auth.uid()::text and o.to_user = messages.receiver)
-          or (o.to_user = auth.uid()::text and o.from_user = messages.receiver)
-        )
-        and (
-          o.status = 'accepted'
-          or (
-            o.status in ('completed', 'rejected', 'cancelled')
-            and (o.status = 'completed' or o.data ? 'acceptedAt' or exists (select 1 from messages m2 where m2.offer_id = o.id))
-            and (now_ms() - coalesce((o.data->>'completedAt')::bigint, (o.data->>'updatedAt')::bigint, (o.data->>'createdAt')::bigint)) <= 604800000
-          )
-        )
-    )
+    and can_write_chat_message(offer_id, sender, receiver)
   );
 
 -- 알림: 받는 사람만 읽고·읽음 처리·삭제할 수 있어요. 생성은 DB 트리거로만 해요.

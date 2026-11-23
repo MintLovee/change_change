@@ -5,28 +5,52 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 function loadBaggullaeVm() {
-  const noopEl = () => ({
-    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
-    dataset: {},
-    style: {},
-    children: [],
-    append() {},
-    appendChild() {},
-    prepend() {},
-    remove() {},
-    insertAdjacentHTML() {},
-    addEventListener() {},
-    setAttribute() {},
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    focus() {},
-    scrollHeight: 0,
-    scrollTop: 0,
-    clientHeight: 0,
-    innerHTML: '',
-    textContent: '',
-    hidden: false,
-  });
+  const mkEl = (id = '') => {
+    const classes = new Set();
+    const el = {
+      id,
+      className: '',
+      classList: {
+        toggle(c, force) { if (force === undefined) { classes.has(c) ? classes.delete(c) : classes.add(c); } else if (force) classes.add(c); else classes.delete(c); },
+        add(...cs) { cs.forEach(c => classes.add(c)); },
+        remove(...cs) { cs.forEach(c => classes.delete(c)); },
+        contains: c => classes.has(c),
+      },
+      dataset: {},
+      style: {},
+      children: [],
+      append() {},
+      appendChild() {},
+      prepend() {},
+      remove() {},
+      insertAdjacentHTML() {},
+      addEventListener() {},
+      setAttribute() {},
+      removeAttribute() {},
+      querySelector: s => (s === '#auth' || s === '.sheet' || s === '.dialog' || s === '.viewer' ? null : mkEl()),
+      querySelectorAll: () => [],
+      focus() {},
+      scrollHeight: 0,
+      scrollTop: 0,
+      clientHeight: 0,
+      innerHTML: '',
+      textContent: '',
+      value: '',
+      disabled: false,
+      hidden: false,
+    };
+    return el;
+  };
+  const elems = {
+    '#main': mkEl('main'),
+    '#pages': mkEl('pages'),
+    '#pageScrim': mkEl('pageScrim'),
+    '#sidebar': mkEl('sidebar'),
+    '#fab': mkEl('fab'),
+    '#tabbar': mkEl('tabbar'),
+    '#stage': mkEl('stage'),
+    '#tabview': mkEl('tabview'),
+  };
 
   const ls = new Map();
   const sandbox = {
@@ -66,10 +90,13 @@ function loadBaggullaeVm() {
       body: { contains: () => false },
       activeElement: null,
       addEventListener() {},
-      querySelector: s => (s === '#auth' || s === '.sheet' || s === '.dialog' ? null : noopEl()),
+      querySelector: s => {
+        if (s === '#tabview') return elems['#main'].innerHTML.includes('id="tabview"') ? elems['#tabview'] : null;
+        return elems[s] || (s === '#auth' || s === '.sheet' || s === '.dialog' || s === '.viewer' ? null : mkEl());
+      },
       querySelectorAll: () => [],
-      getElementById: () => noopEl(),
-      createElement: () => noopEl(),
+      getElementById: id => elems['#' + id] || mkEl(id),
+      createElement: () => mkEl(),
     },
     APP_CONFIG: { supabaseUrl: '', supabaseAnonKey: '' },
     addEventListener() {},
@@ -84,10 +111,11 @@ function loadBaggullaeVm() {
   vm.runInContext(locCode, sandbox, { filename: 'src/location.js' });
   vm.runInContext(appCode, sandbox, { filename: 'src/app.js' });
   // Expose top-level lexical bindings (const/let) via helper eval inside context
-  return vm.runInContext(
-    '({ S, App, CENT, STATIONS, GEO, REGIONS, LOC, detectPrivateInfo, validNick, krError, normalizeSupabaseUrl, evalPasswordSecurity, offerById, chatMessagesOf, hasChatRoom, chatWriteState, canWriteChat, unreadChatCount, unreadNotifCount, myChatRooms, onboardingProgress, homeGreeting, tempOf, matchFeed, extractStoragePath, initDemoData, CHAT_GRACE_MS })',
+  const exported = vm.runInContext(
+    '({ S, App, UI, ACT, CENT, STATIONS, GEO, REGIONS, LOC, detectPrivateInfo, validNick, krError, normalizeSupabaseUrl, evalPasswordSecurity, offerById, chatMessagesOf, hasChatRoom, chatWriteState, canWriteChat, unreadChatCount, unreadNotifCount, myChatRooms, onboardingProgress, homeGreeting, tempOf, matchFeed, extractStoragePath, initDemoData, signOutLocal, pushPage, CHAT_GRACE_MS })',
     sandbox
   );
+  return { ...exported, elems };
 }
 
 const ctx = loadBaggullaeVm();
@@ -316,10 +344,65 @@ describe('바꿀래 핵심 로직 단위 테스트', () => {
     assert.deepEqual(jnKakao, { region: '전라남도', dong: '여수시 둔덕동', fullLabel: '전라남도 여수시 둔덕동' });
   });
 
-  it('krError: 채팅·스토리지 관련 오류 코드를 명확한 한국어로 안내한다', () => {
+  it('krError: 채팅·스토리지·보안정책(42P17) 오류 코드를 명확한 한국어로 안내한다', () => {
     assert.match(ctx.krError({ code: 'PGRST202', message: 'Could not find the function public.mark_chat_read' }), /schema\.sql/);
     assert.match(ctx.krError({ code: 'PGRST205', message: 'Could not find the table public.messages' }), /schema\.sql/);
+    assert.match(ctx.krError({ code: '42P17', message: 'infinite recursion detected in policy for relation "messages"' }), /schema\.sql/);
+    assert.match(ctx.krError({ code: 'PGRST204', message: "Could not find the 'data' column" }), /schema\.sql/);
+    assert.match(ctx.krError({ code: '22P02', message: 'invalid input syntax' }), /형식/);
     assert.match(ctx.krError({ message: 'Bucket not found' }), /item-photos/);
     assert.match(ctx.krError({ code: '23514', message: 'new row violates check constraint' }), /형식이 맞지 않아요/);
+  });
+
+  it('signOutLocal: 로그아웃 시 기존 화면(#main, #pages)과 스택·네비게이션 크롬을 즉시 비운다', () => {
+    ctx.initDemoData();
+    ctx.elems['#main'].innerHTML = '<div class="view" id="tabview">old</div>';
+    ctx.elems['#main'].classList.add('under', 'pushed');
+    ctx.elems['#pages'].innerHTML = '<div class="page in">chat</div>';
+    ctx.elems['#pageScrim'].classList.add('in');
+    ctx.UI.stack.push({ type: 'chat', id: 'demo-o1', key: 'k1' });
+    ctx.UI.tab = 'me';
+
+    ctx.signOutLocal();
+
+    assert.equal(ctx.App.session, false);
+    assert.equal(ctx.App.me, null);
+    assert.equal(ctx.UI.stack.length, 0);
+    assert.equal(ctx.UI.tab, 'home');
+    assert.equal(ctx.elems['#main'].innerHTML, '');
+    assert.equal(ctx.elems['#main'].className, '');
+    assert.equal(ctx.elems['#pages'].innerHTML, '');
+    assert.equal(ctx.elems['#pageScrim'].classList.contains('in'), false);
+    assert.equal(ctx.elems['#sidebar'].classList.contains('hidden'), true);
+  });
+
+  it('ACT.tab: 채팅이나 물건 상세 페이지가 열린 상태에서 메뉴를 누르면 스택을 닫고 해당 탭으로 전환한다', () => {
+    ctx.initDemoData();
+    ctx.UI.tab = 'home';
+    ctx.pushPage({ type: 'item', id: 'ex-i1' });
+    ctx.pushPage({ type: 'chat', id: 'demo-o1' });
+    assert.equal(ctx.UI.stack.length, 2);
+
+    ctx.ACT.tab({ tab: 'me' });
+    assert.equal(ctx.UI.stack.length, 0);
+    assert.equal(ctx.UI.tab, 'me');
+    assert.equal(ctx.elems['#pageScrim'].classList.contains('in'), false);
+
+    // 같은 탭이 선택된 상태에서 상세 페이지가 열린 경우에도 메뉴를 누르면 스택이 닫혀야 한다
+    ctx.pushPage({ type: 'item', id: 'demo-my1' });
+    assert.equal(ctx.UI.stack.length, 1);
+    ctx.ACT.tab({ tab: 'me' });
+    assert.equal(ctx.UI.stack.length, 0);
+    assert.equal(ctx.UI.tab, 'me');
+  });
+
+  it('supabase/schema.sql: messages insert 정책이 자기 테이블 재귀 없이 can_write_chat_message 함수를 사용한다', () => {
+    const schemaSql = fs.readFileSync(path.resolve('supabase/schema.sql'), 'utf8');
+    assert.match(schemaSql, /create or replace function can_write_chat_message\(/);
+    assert.match(schemaSql, /grant execute on function can_write_chat_message\(text, text, text\) to authenticated/);
+    const policyMatch = schemaSql.match(/create policy "messages insert parties"[\s\S]*?;\n/);
+    assert.ok(policyMatch, 'messages insert parties policy should exist');
+    assert.match(policyMatch[0], /can_write_chat_message\(offer_id, sender, receiver\)/);
+    assert.doesNotMatch(policyMatch[0], /from messages\b/);
   });
 });
