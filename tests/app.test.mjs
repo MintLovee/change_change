@@ -405,4 +405,29 @@ describe('바꿀래 핵심 로직 단위 테스트', () => {
     assert.match(policyMatch[0], /can_write_chat_message\(offer_id, sender, receiver\)/);
     assert.doesNotMatch(policyMatch[0], /from messages\b/);
   });
+
+  it('supabase/seed.sql: 전라남도 목포시 기반 목업 유저·물건·제안·채팅·챌린지 정합성을 유지한다', () => {
+    const seedSql = fs.readFileSync(path.resolve('supabase/seed.sql'), 'utf8');
+    const nicks = [...seedSql.matchAll(/"nickname":"([^"]+)"/g)].map(m => m[1]);
+    assert.equal(nicks.length, 10);
+    assert.equal(new Set(nicks).size, 10);
+    nicks.forEach(n => assert.match(n, /^[가-힣a-zA-Z0-9]{2,10}$/));
+
+    const dongs = [...seedSql.matchAll(/"dong":"([^"]+)"/g)].map(m => m[1]);
+    assert.equal(dongs.length, 10);
+    dongs.forEach(d => assert.match(d, /^목포시 /));
+
+    const itemMatches = [...seedSql.matchAll(/\('mock-i\d{2}',\s*'(\{[^']+\})'::jsonb/g)];
+    assert.equal(itemMatches.length, 36);
+    itemMatches.forEach(m => {
+      const it = JSON.parse(m[1]);
+      assert.equal(it.region, '전라남도');
+      assert.ok(Array.isArray(it.photos) && it.photos.length >= 1);
+      assert.ok(['available', 'reserved', 'traded'].includes(it.status));
+    });
+
+    assert.equal((seedSql.match(/\('mock-o\d{2}'/g) || []).length, 11);
+    assert.equal((seedSql.match(/\('mock-m\d{2}'/g) || []).length, 16);
+    assert.equal((seedSql.match(/^\s*'mock-c\d',/gm) || []).length, 5);
+  });
 });
