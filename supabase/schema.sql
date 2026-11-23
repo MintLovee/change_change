@@ -169,7 +169,7 @@ create policy "messages insert parties" on messages for insert to authenticated
           o.status = 'accepted'
           or (
             o.status in ('completed', 'rejected', 'cancelled')
-            and (o.data ? 'acceptedAt' or exists (select 1 from messages m2 where m2.offer_id = o.id))
+            and (o.status = 'completed' or o.data ? 'acceptedAt' or exists (select 1 from messages m2 where m2.offer_id = o.id))
             and (now_ms() - coalesce((o.data->>'completedAt')::bigint, (o.data->>'updatedAt')::bigint, (o.data->>'createdAt')::bigint)) <= 604800000
           )
         )
@@ -424,4 +424,7 @@ begin
     alter publication supabase_realtime add table profiles, items, offers, challenges, reviews, favorites, messages, notifications;
   end if;
 end $$;
+
+-- PostgREST 스키마 캐시 즉시 새로고침 (신규 테이블/RPC 함수 즉시 인식)
+notify pgrst, 'reload schema';
 

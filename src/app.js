@@ -316,21 +316,32 @@ const PendingOps = new Map();
 
 function krError(e) {
   const m = (e && (e.message || e.error_description)) || '';
+  const code = e && e.code;
   if (/Invalid login credentials/i.test(m)) return '이메일 또는 비밀번호가 맞지 않아요. 다시 확인한 뒤 입력해 주세요.';
   if (/Email not confirmed/i.test(m)) return '메일 인증이 끝나지 않았어요. 받은편지함의 인증 링크를 먼저 눌러 주세요.';
   if (/already registered/i.test(m)) return '이미 가입한 이메일이에요. 로그인 화면에서 로그인해 주세요.';
   if (/Password should be/i.test(m)) return '비밀번호가 너무 짧아요. 8자 이상으로 입력해 주세요.';
   if (/same password/i.test(m)) return '지금 쓰고 있는 비밀번호와 같아요. 다른 비밀번호를 입력해 주세요.';
   if (/rate limit|too many/i.test(m)) return '요청을 너무 자주 보냈어요. 1분 정도 기다린 뒤 다시 시도해 주세요.';
-  if (e && e.code === '23505') {
+  if (code === '23505') {
     if (/nickname/i.test(m) || /nickname/i.test((e && e.details) || '')) return '이미 다른 사람이 쓰고 있는 닉네임이에요. 다른 이름을 입력해 주세요.';
     return '이미 저장된 정보예요. 새로고침한 뒤 다시 확인해 주세요.';
   }
-  if (e && e.code === '42501') {
+  if (code === '23514') return '입력한 내용의 형식이 맞지 않아요. 내용을 다시 확인해 주세요.';
+  if (code === 'PGRST202' || code === '42883' || /Could not find the function/i.test(m)) {
+    return '데이터베이스 함수가 아직 적용되지 않았어요. Supabase SQL Editor에서 최신 schema.sql을 실행한 뒤 새로고침해 주세요.';
+  }
+  if (code === 'PGRST205' || code === '42P01' || /Could not find the table/i.test(m)) {
+    return '데이터베이스 테이블이 아직 준비되지 않았어요. Supabase SQL Editor에서 schema.sql을 실행해 주세요.';
+  }
+  if (code === '42501') {
     if (/permission denied for table/i.test(m)) return '데이터베이스 테이블 권한이 설정되지 않았어요. Supabase SQL Editor에서 schema.sql을 다시 실행해 주세요.';
     return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
   }
-  if (e && e.code === 'NO_ROWS') return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
+  if (/Bucket not found/i.test(m)) return '사진 저장 공간(item-photos 버킷)이 없어요. Supabase SQL Editor에서 schema.sql을 실행해 주세요.';
+  if (/Payload too large|exceeded the maximum|413/i.test(m)) return '사진 파일 용량이 너무 커서 올릴 수 없어요. 다른 사진을 골라 주세요.';
+  if (/row-level security/i.test(m)) return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
+  if (code === 'NO_ROWS') return '권한이 없어 처리하지 못했어요. 로그인 상태를 확인해 주세요.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return '인터넷 연결이 불안정해 저장하지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.';
   if (/[가-힣]/.test(m)) return m;
   return '작업을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.';
@@ -382,6 +393,7 @@ const Store = {
 
 function handleWriteError(e) {
   console.error('[바꿀래 저장 오류]', e);
+  if (e && typeof e === 'object') e._handled = true;
   if (e && (e.status === 401 || /JWT expired/i.test(e.message || ''))) { toast('로그인이 만료됐어요. 다시 로그인해 주세요.'); signOutLocal(); return; }
   toast(krError(e));
 }
@@ -433,7 +445,7 @@ function signOutLocal() {
   while (UI.stack.length) popPage();
   $$('.sheet').forEach(sh => closeSheet(sh, {force:true}));
   const a = $('#auth'); if (a) a.remove();
-  OB.step = 0; OB.nickname = ''; OB.region = ''; OB.wants = []; OB.agree = [false, false, false];
+  OB.step = 0; OB.nickname = ''; OB.sido = '서울특별시'; OB.region = ''; OB.dong = ''; OB.loc = null; OB.locVerified = false; OB.wants = []; OB.agree = [false, false, false];
   render();
 }
 
@@ -958,7 +970,8 @@ function offerCard(o) {
 /* ---- 마이 ---- */
 function profileBlock(id, own) {
   const p = profileOf(id); const t = tempOf(id); const reviews = reviewsFor(id);
-  let h = `<div class="profile-head">${avatar(id, 'lg')}<div style="flex:1;min-width:0"><div class="pn">${esc(p.nickname)}</div><div class="pr">${esc(p.region)} · ${p.createdAt ? dateStr(p.createdAt) + ' 가입' : ''}</div></div>${own ? `<button class="btn btn-gray btn-sm" data-act="editProfile">프로필 수정</button>` : ''}</div>`;
+  const regLabel = LOC.userRegionLabel ? LOC.userRegionLabel(p) : p.region;
+  let h = `<div class="profile-head">${avatar(id, 'lg')}<div style="flex:1;min-width:0"><div class="pn">${esc(p.nickname)}</div><div class="pr">${esc(regLabel)}${p.createdAt ? ' · ' + dateStr(p.createdAt) + ' 가입' : ''}</div></div>${own ? `<button class="btn btn-gray btn-sm" data-act="editProfile">프로필 수정</button>` : ''}</div>`;
   h += `<div class="tempcard"><div class="th"><span>교환온도</span><b class="num" style="color:${tempColor(t)}">${t.toFixed(1)}°C</b></div><div class="tbar"><i style="width:${Math.min(100, t)}%;background:${tempColor(t)}"></i></div><div class="tfoot"><span>첫 온도 36.5°C</span><span>좋아요 +0.5° · 별로예요 −1°</span></div></div>`;
   h += `<div class="stats"><div><b class="num">${tradeCount(id)}</b><span>교환 완료</span></div><div><b class="num">${itemsOf(id).filter(i => i.status !== 'traded').length}</b><span>교환 가능 물건</span></div><div><b class="num">${reviews.length}</b><span>받은 후기</span></div></div>`;
   return h;
@@ -973,17 +986,12 @@ function reviewList(id, self = false) {
   return `<div class="group">${rs.map(r => `<div class="review"><div class="rh">${avatar(r.from, 'sm')}${esc(profileOf(r.from).nickname)}<small>· ${lbl[r.score]} · ${ago(r.at)}</small></div>${r.text ? `<p>${esc(r.text)}</p>` : ''}</div>`).join('')}</div>`;
 }
 function viewMe() {
-  let h = navBar('나의 바꿀래') + '<div class="large-title">나의 바꿀래</div><div class="stagger desktop-2col"><div>';
+  let h = navBar('나의 바꿀래') + '<div class="large-title">나의 바꿀래</div><div class="stagger"><div class="desktop-2col"><div>';
   h += profileBlock(App.me, true);
   const wants = wantsOf(App.me);
   const myRegionTxt = LOC.userRegionLabel ? LOC.userRegionLabel(profileOf(App.me)) : profileOf(App.me).region;
   h += `<div class="section"><div class="section-head"><h2>찾는 것</h2><button class="more" data-act="openWants">편집 ${wants.length}/5</button></div><div class="chips">${wants.length ? wants.map(w => `<span class="chip">${esc(wantLabel(w))}</span>`).join('') : '<button class="chip" data-act="openWants">' + I.plus + '찾는 것 등록</button>'}</div></div>`;
-  h += `<div class="group-label">설정</div><div class="group">
-    <button class="menu-row" data-act="openRegion"><span class="mi" style="background:var(--accent)">${I.pin}</span><span class="ml">내 동네 설정</span><span class="mv">${esc(myRegionTxt)}</span><span class="chev">${I.chev}</span></button>
-    <button class="menu-row" data-act="changePassword"><span class="mi" style="background:var(--contrast)">${I.lock}</span><span class="ml">비밀번호 변경</span><span class="chev">${I.chev}</span></button>
-    <button class="menu-row" data-act="showPolicy"><span class="mi" style="background:var(--good)">${I.shield}</span><span class="ml">안전한 교환 가이드</span><span class="chev">${I.chev}</span></button>
-    <button class="menu-row danger" data-act="logout"><span class="mi" style="background:var(--bad)">${I.logout}</span><span class="ml">로그아웃</span></button>
-    <button class="menu-row danger" data-act="deleteAccount"><span class="mi" style="background:var(--muted)">${I.trash}</span><span class="ml">회원 탈퇴</span></button></div></div><div>`;
+  h += '</div><div>';
   h += `<div class="seg" data-seg="meSeg"><button class="${UI.meSeg === 'items' ? 'on' : ''}" data-act="meSeg" data-v="items">내 물건</button><button class="${UI.meSeg === 'favs' ? 'on' : ''}" data-act="meSeg" data-v="favs">찜한 물건</button><button class="${UI.meSeg === 'reviews' ? 'on' : ''}" data-act="meSeg" data-v="reviews">받은 후기</button></div>`;
   if (UI.meSeg === 'items') {
     const its = itemsOf(App.me);
@@ -994,7 +1002,14 @@ function viewMe() {
   } else {
     h += reviewList(App.me, true);
   }
-  return h + '</div></div>';
+  h += '</div></div>';
+  h += `<div class="group-label">설정</div><div class="group">
+    <button class="menu-row" data-act="openRegion"><span class="mi" style="background:var(--accent)">${I.pin}</span><span class="ml">내 동네 설정</span><span class="mv">${esc(myRegionTxt)}</span><span class="chev">${I.chev}</span></button>
+    <button class="menu-row" data-act="changePassword"><span class="mi" style="background:var(--contrast)">${I.lock}</span><span class="ml">비밀번호 변경</span><span class="chev">${I.chev}</span></button>
+    <button class="menu-row" data-act="showPolicy"><span class="mi" style="background:var(--good)">${I.shield}</span><span class="ml">안전한 교환 가이드</span><span class="chev">${I.chev}</span></button>
+    <button class="menu-row danger" data-act="logout"><span class="mi" style="background:var(--bad)">${I.logout}</span><span class="ml">로그아웃</span></button>
+    <button class="menu-row danger" data-act="deleteAccount"><span class="mi" style="background:var(--muted)">${I.trash}</span><span class="ml">회원 탈퇴</span></button></div>`;
+  return h + '</div>';
 }
 
 /* ============ 푸시 페이지 + iOS 좌측 가장자리 스와이프 뒤로가기 ============ */
@@ -1234,20 +1249,42 @@ function renderChatPage(el, p, first) {
           photoUrl = await uploadPhotoBlob(`chat_${o.id}`, msgId, blob);
         } finally { URL.revokeObjectURL(tmpUrl); }
       }
-      await Store.set('messages', msgId, {offer:o.id, sender:App.me, receiver:other, text, photo:photoUrl, at:now(), readAt:null});
-      requestAnimationFrame(() => { sc.scrollTop = sc.scrollHeight; });
+      const msgData = {offer:o.id, sender:App.me, receiver:other, text, at:now(), readAt:null};
+      if (photoUrl) msgData.photo = photoUrl;
+      await Store.set('messages', msgId, msgData);
+      requestAnimationFrame(() => { if (sc) sc.scrollTop = sc.scrollHeight; });
     } catch (e) {
       if (text && !inp.value) inp.value = text;
       syncSend();
+      if (!e || !e._handled) handleWriteError(e);
     }
   };
   sendBtn.addEventListener('click', doSend);
 }
 
 async function markChatRead(offerId) {
-  const unread = chatMessagesOf(offerId).some(m => m.receiver === App.me && !m.readAt);
-  if (!unread) return;
-  try { await Store.rpc('mark_chat_read', {p_offer:offerId}); } catch (e) {}
+  const unreadMsgs = chatMessagesOf(offerId).filter(m => m.receiver === App.me && !m.readAt);
+  if (!unreadMsgs.length) return;
+  const ts = now();
+  const nextMessages = {...S.messages};
+  let changed = false;
+  unreadMsgs.forEach(m => {
+    if (nextMessages[m.id] && !nextMessages[m.id].readAt) {
+      nextMessages[m.id] = {...nextMessages[m.id], readAt:ts};
+      changed = true;
+    }
+  });
+  if (changed) {
+    S.messages = nextMessages;
+    scheduleRender();
+  }
+  if (App.demo || !sb) return;
+  try {
+    const {error} = await sb.rpc('mark_chat_read', {p_offer:offerId});
+    if (error) console.warn('[바꿀래 읽음 처리]', error);
+  } catch (e) {
+    console.warn('[바꿀래 읽음 처리]', e);
+  }
 }
 
 function pageChallenge(id) {
@@ -1478,7 +1515,8 @@ async function withLock(btn, busyText, fn) {
 function guardWrite() { if (App.readOnly) { toast('보기 전용이라 저장할 수 없어요. 참여자 권한을 확인해 주세요.'); return false; } return true; }
 
 /* ============ 인증 (로그인 · 회원가입 · 비밀번호 찾기/재설정 · 온보딩) ============ */
-const OB = {step:0, nickname:'', region:'', dong:'', loc:null, locVerified:false, wants:[], agree:[false, false, false]};
+const OB = {step:0, nickname:'', sido:'서울특별시', region:'', dong:'', loc:null, locVerified:false, wants:[], agree:[false, false, false]};
+let obPicker = null;
 function renderAuth() {
   let a = $('#auth'); if (!a) { a = document.createElement('div'); a.id = 'auth'; a.className = 'auth'; $('#stage').appendChild(a); }
   $('#fab').classList.add('hidden'); $('#tabbar').classList.add('hidden');
@@ -1509,16 +1547,31 @@ function renderOnboard(animate = true) {
   const a = $('#auth'); a.dataset.mode = 'onboard';
   const s = OB.step;
   let body = '';
+  const obLocInfo = OB.region && LOC.inferSidoFromProfile
+    ? LOC.inferSidoFromProfile(OB.region, OB.dong, SEOUL_GU)
+    : {sido:OB.sido || '서울특별시', sigungu:''};
+  if (s === 1 && !OB.sido) OB.sido = obLocInfo.sido;
   if (s === 0) body = `<h2>반가워요!<br>어떻게 불러드릴까요?</h2><p class="lead">교환할 때 상대에게 보이는 닉네임이에요.</p><div class="field"><label for="obNick">닉네임</label><input class="input" id="obNick" maxlength="10" placeholder="2~10자 닉네임" value="${esc(OB.nickname)}" autocomplete="nickname"><div class="hint" id="obNickHint">한글, 영문, 숫자로 2~10자</div></div>`;
-  else if (s === 1) body = `<h2>어느 동네에서<br>교환하시나요?</h2><p class="lead">현재 위치로 찾거나 아래에서 직접 고를 수 있어요.</p>
+  else if (s === 1) body = `<h2>어느 동네에서<br>교환하시나요?</h2><p class="lead">현재 위치로 찾거나 시·도부터 직접 고를 수 있어요.</p>
     <button type="button" class="loc-btn" data-act="obGps" id="obGpsBtn" style="margin-bottom:12px">${I.gps}<span>현재 위치로 내 동네 찾기</span></button>
-    <div id="obGpsStatus" style="margin-bottom:12px">${OB.locVerified && OB.region ? `<div class="loc-verified">${I.check}<span>${esc(OB.dong ? `${OB.region} · ${OB.dong}` : OB.region)} 확인됨</span></div>` : ''}</div>
-    <div class="region-grid">${REGIONS.map(r => `<button class="chip ${OB.region === r ? 'on-accent' : ''}" data-act="obRegion" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>`;
+    <div id="obGpsStatus" style="margin-bottom:12px">${OB.region ? `<div class="loc-verified">${I.check}<span>${esc(LOC.userRegionLabel ? LOC.userRegionLabel(OB) : (OB.dong ? `${OB.region} · ${OB.dong}` : OB.region))}${OB.locVerified ? ' 인증됨' : ' 선택됨'}</span></div>` : ''}</div>
+    ${renderSidoPickerHtml(obLocInfo.sido, obLocInfo.sigungu, 'ob')}`;
   else if (s === 2) body = `<h2>찾고 있는 물건이<br>있나요?</h2><p class="lead">나중에 등록해도 괜찮아요. 최대 5개까지 고를 수 있어요.</p><div class="chips wrap">${CATS.map(c => c.subs.map(([id, n]) => { const on = OB.wants.some(w => w.c === id); return `<button class="chip ${on ? 'on-accent' : ''}" data-act="obWant" data-v="${id}">${n}</button>`; }).join('')).join('')}</div>`;
   else body = `<h2>마지막으로<br>약속해 주세요</h2><p class="lead">모두가 믿고 교환할 수 있도록 지켜야 할 것들이에요.</p>${[['이용약관 동의 (필수)', '교환은 당사자 간 거래이며 바꿀래는 중개하지 않아요.'], ['개인정보 처리 동의 (필수)', '닉네임·동네·등록 물건만 저장해요. 주소는 저장하지 않아요.'], ['안전 교환 약속 (필수)', '대면은 역·카페 같은 공공장소에서, 현금 거래는 하지 않아요.']].map(([b, t], i) => `<button class="check-row ${OB.agree[i] ? 'on' : ''}" data-act="obAgree" data-i="${i}"><span class="cbox">${I.check}</span><span><b>${b}</b><span>${t}</span></span></button>`).join('')}`;
   const can = s === 0 ? validNick(OB.nickname) === '' : s === 1 ? !!OB.region : s === 2 ? true : OB.agree.every(Boolean);
   a.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><button class="nav-btn" data-act="obBack" aria-label="뒤로">${I.back}</button></div><div class="steps-dots">${[0, 1, 2, 3].map(i => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div><div class="ob-step ${animate ? 'anim' : ''}" style="flex:1">${body}</div><div class="auth-actions" style="margin-top:20px;animation:none">${s === 2 ? `<button class="btn btn-primary btn-block" data-act="obNext">${OB.wants.length ? OB.wants.length + '개 선택 · 다음' : '건너뛰기'}</button>` : `<button class="btn btn-primary btn-block" data-act="obNext" ${can ? '' : 'disabled'}>${s === 3 ? '가입 완료' : '다음'}</button>`}</div>`;
   if (s === 0) { const inp = $('#obNick'); setTimeout(() => inp.focus(), 300); inp.addEventListener('input', () => { OB.nickname = inp.value; const err = validNick(inp.value); const h = $('#obNickHint'); h.textContent = err || '좋은 닉네임이에요!'; h.classList.toggle('err', !!err && inp.value.length > 0); $('[data-act="obNext"]').disabled = !!err; }); inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !validNick(inp.value)) ACT.obNext(); }); }
+  if (s === 1) {
+    obPicker = bindSidoPicker(a, {sido:obLocInfo.sido, sigungu:obLocInfo.sigungu}, resolved => {
+      OB.sido = resolved.sido; OB.region = resolved.region; OB.dong = resolved.dong; OB.loc = resolved.loc; OB.locVerified = false;
+      const st = $('#obGpsStatus', a);
+      if (st) st.innerHTML = `<div class="loc-verified">${I.check}<span>${esc(resolved.label)} 선택됨</span></div>`;
+      const next = $('[data-act="obNext"]', a);
+      if (next) next.disabled = !OB.region;
+    }, 'ob');
+  } else {
+    obPicker = null;
+  }
 }
 function validNick(v, self) {
   v = (v || '').trim();
@@ -1631,15 +1684,6 @@ function renderAuthForm(kind) {
     <button class="btn btn-ghost btn-block" data-act="${up ? 'login' : 'signup'}" style="margin-top:4px">${up ? '이미 가입했어요 · 로그인' : '처음이에요 · 회원가입'}</button></div>`;
   bindPwToggles(a);
   if (up) bindPasswordSecurity(a, '#aPw', '#aPw2', 'aPw');
-  else {
-    $$('[data-demo-email]', a).forEach(btn => {
-      btn.addEventListener('click', () => {
-        $('#aEmail', a).value = btn.dataset.demoEmail;
-        $('#aPw', a).value = btn.dataset.demoPw;
-        $('#authForm', a).requestSubmit();
-      });
-    });
-  }
   setTimeout(() => { const el = $('#aEmail'); el && el.focus(); }, 300);
   $('#authForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1837,16 +1881,6 @@ const ACT = {
     if (OB.step > 0) { OB.step--; renderOnboard(); return; }
     if (await confirmDialog('가입을 그만둘까요?', '로그아웃되고, 다음에 로그인하면 프로필 만들기부터 이어서 할 수 있어요.', '그만두기', true)) { await signOut(); }
   },
-  obRegion(d) {
-    OB.region = d.v; OB.dong = ''; OB.loc = CENT[d.v] ? {lat:CENT[d.v][0], lng:CENT[d.v][1]} : null; OB.locVerified = false;
-    const a = $('#auth');
-    if (a) {
-      $$('[data-act="obRegion"]', a).forEach(b => b.classList.toggle('on-accent', b.dataset.v === OB.region));
-      const st = $('#obGpsStatus', a); if (st) st.innerHTML = '';
-      const next = $('[data-act="obNext"]', a);
-      if (next) next.disabled = !OB.region;
-    } else renderOnboard(false);
-  },
   async obGps(d, el) {
     const a = $('#auth');
     const orig = el.innerHTML;
@@ -1854,12 +1888,14 @@ const ACT = {
     el.innerHTML = `<span class="loc-spin"></span><span>현재 위치를 확인하는 중…</span>`;
     try {
       const res = await detectCurrentNeighborhood();
+      const inf = LOC.inferSidoFromProfile ? LOC.inferSidoFromProfile(res.region, res.dong, SEOUL_GU) : {sido:'서울특별시', sigungu:res.region};
+      OB.sido = inf.sido;
       OB.region = res.region;
       OB.dong = res.dong;
       OB.loc = {lat:res.lat, lng:res.lng};
       OB.locVerified = true;
       if (a) {
-        $$('[data-act="obRegion"]', a).forEach(b => b.classList.toggle('on-accent', b.dataset.v === OB.region));
+        if (obPicker) obPicker.sync(inf.sido, inf.sigungu);
         const st = $('#obGpsStatus', a);
         if (st) st.innerHTML = `<div class="loc-verified">${I.check}<span>${esc(res.fullLabel)} 확인됨${res.viaKakao ? ' (카카오맵)' : ''}</span></div>`;
         const next = $('[data-act="obNext"]', a);
@@ -2220,7 +2256,9 @@ function openItemMenu(id) {
 function openMapPicker(initial, region, onPick) {
   let pick = initial ? {...initial} : null; let nameEdited = false;
   const meCoord = myGeoCoords();
-  const center = initial ? [initial.lat, initial.lng] : meCoord ? [meCoord.lat, meCoord.lng] : (CENT[region] || SEOUL_CENTER);
+  const me = App.me ? profileOf(App.me) : null;
+  const fallbackCoord = (LOC.regionCoords ? LOC.regionCoords(region, me && me.dong, CENT) : CENT[region]) || SEOUL_CENTER;
+  const center = initial ? [initial.lat, initial.lng] : meCoord ? [meCoord.lat, meCoord.lng] : fallbackCoord;
   const kNote = kakaoStatusNote();
   openSheet({title:'만남 장소 선택', full:true, body:'', onMount(sh) {
     const b = $('.sheet-body', sh); b.style.cssText = 'padding:0;display:flex;flex-direction:column;overflow:hidden';
@@ -2316,13 +2354,100 @@ function svgPicker(el, center, initial, setPick) {
   return api;
 }
 
+/* 전국 시·도 → 시·군·구 공통 선택 UI */
+function renderSidoPickerHtml(sido, sigungu, idPrefix = 'sp') {
+  const list = LOC.SIDO_DATA || [];
+  const activeSido = list.find(s => s.name === sido) || list[0];
+  if (!activeSido) {
+    return `<div class="region-grid" id="${idPrefix}Sigungu">${REGIONS.map(r => `<button type="button" class="chip ${sigungu === r ? 'on-accent' : ''}" data-sigungu="${esc(r)}">${esc(r)}</button>`).join('')}</div>`;
+  }
+  return `<div class="sido-picker" id="${idPrefix}Picker">
+    <div class="sido-sub-lbl">시 · 도</div>
+    <div class="sido-grid" role="tablist" aria-label="시·도 선택">${list.map(s => `<button type="button" class="chip ${s.name === activeSido.name ? 'on' : ''}" data-sido="${esc(s.name)}" role="tab" aria-selected="${s.name === activeSido.name}">${esc(s.short)}</button>`).join('')}</div>
+    <div class="sido-sub-lbl" style="margin-top:10px">시 · 군 · 구 <small>${esc(activeSido.name)}</small></div>
+    <div class="region-grid sigungu-grid" id="${idPrefix}Sigungu">${activeSido.subs.map(([subName]) => `<button type="button" class="chip ${subName === sigungu ? 'on-accent' : ''}" data-sigungu="${esc(subName)}">${esc(subName)}</button>`).join('')}</div>
+  </div>`;
+}
+
+function bindSidoPicker(root, state, onPick, idPrefix = 'sp') {
+  const picker = $('#' + idPrefix + 'Picker', root);
+  if (!picker) return {sync() {}};
+  const renderSubs = () => {
+    const list = LOC.SIDO_DATA || [];
+    const activeSido = list.find(s => s.name === state.sido) || list[0];
+    $$('[data-sido]', picker).forEach(b => {
+      const on = b.dataset.sido === activeSido.name;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    const lbl = picker.querySelector('.sido-sub-lbl small');
+    if (lbl) lbl.textContent = activeSido.name;
+    const grid = $('#' + idPrefix + 'Sigungu', picker);
+    if (grid) {
+      grid.innerHTML = activeSido.subs.map(([subName]) => `<button type="button" class="chip ${subName === state.sigungu ? 'on-accent' : ''}" data-sigungu="${esc(subName)}">${esc(subName)}</button>`).join('');
+    }
+  };
+  picker.addEventListener('click', e => {
+    const sidoBtn = e.target.closest('[data-sido]');
+    if (sidoBtn) {
+      const nextSido = sidoBtn.dataset.sido;
+      if (state.sido !== nextSido) {
+        state.sido = nextSido;
+        state.sigungu = '';
+        renderSubs();
+      }
+      return;
+    }
+    const subBtn = e.target.closest('[data-sigungu]');
+    if (subBtn) {
+      const resolved = LOC.resolveRegionSelection(state.sido, subBtn.dataset.sigungu);
+      state.sido = resolved.sido;
+      state.sigungu = resolved.sigungu;
+      $$('[data-sigungu]', picker).forEach(b => b.classList.toggle('on-accent', b.dataset.sigungu === state.sigungu));
+      onPick(resolved);
+    }
+  });
+  return {
+    sync(nextSido, nextSigungu) {
+      state.sido = nextSido || '서울특별시';
+      state.sigungu = nextSigungu || '';
+      renderSubs();
+    }
+  };
+}
+
+function renderNationwideFallbackSvg(px, py, w, h, radiusPx, label) {
+  const lines = [];
+  const step = Math.max(20, Math.round(w / 6));
+  const x0 = Math.floor((px - w / 2) / step) * step;
+  const y0 = Math.floor((py - h / 2) / step) * step;
+  for (let gx = x0; gx <= px + w / 2 + step; gx += step) {
+    lines.push(`<line x1="${gx}" y1="${(py - h / 2).toFixed(1)}" x2="${gx}" y2="${(py + h / 2).toFixed(1)}"/>`);
+  }
+  for (let gy = y0; gy <= py + h / 2 + step; gy += step) {
+    lines.push(`<line x1="${(px - w / 2).toFixed(1)}" y1="${gy}" x2="${(px + w / 2).toFixed(1)}" y2="${gy}"/>`);
+  }
+  return `<svg viewBox="${(px - w / 2).toFixed(1)} ${(py - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block">
+    <rect x="${(px - w).toFixed(1)}" y="${(py - h).toFixed(1)}" width="${(w * 2).toFixed(1)}" height="${(h * 2).toFixed(1)}" fill="var(--map-land)"/>
+    <g stroke="var(--map-line)" stroke-width="0.9" opacity="0.65">${lines.join('')}</g>
+    <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(w * 0.22).toFixed(1)}" fill="none" stroke="var(--map-line)" stroke-width="1"/>
+    ${radiusPx ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 3"/>` : ''}
+    <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="5" fill="var(--accent)" stroke="#fff" stroke-width="1.8"/>
+    ${label ? `<text x="${px.toFixed(1)}" y="${(py - 11).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="750" fill="var(--text)">${esc(label)}</text>` : ''}
+  </svg>`;
+}
+
 /* 당근마켓 스타일: 내 동네 설정 & 반경 지도 시트 */
 function openRegionSheet() {
   const me = profileOf(App.me);
+  const initCoord = LOC.regionCoords ? LOC.regionCoords(me.region, me.dong, CENT) : null;
+  const inferred = LOC.inferSidoFromProfile ? LOC.inferSidoFromProfile(me.region, me.dong, SEOUL_GU) : {sido:'서울특별시', sigungu:me.region || '마포구'};
   let state = {
+    sido:inferred.sido,
+    sigungu:inferred.sigungu,
     region:me.region || '마포구',
     dong:me.dong || '',
-    loc:me.loc ? {...me.loc} : (CENT[me.region] ? {lat:CENT[me.region][0], lng:CENT[me.region][1]} : {lat:SEOUL_CENTER[0], lng:SEOUL_CENTER[1]}),
+    loc:me.loc ? {...me.loc} : (initCoord ? {lat:initCoord[0], lng:initCoord[1]} : {lat:SEOUL_CENTER[0], lng:SEOUL_CENTER[1]}),
     locVerified:!!me.locVerified,
     rangeKm:UI.rangeKm || 0
   };
@@ -2342,8 +2467,8 @@ function openRegionSheet() {
           <button type="button" data-v="0" class="${state.rangeKm === 0 ? 'on' : ''}">전체 지역</button>
         </div>
       </div>
-      <div class="field"><div class="lbl">직접 동네 고르기</div>
-        <div class="region-grid" id="rGrid">${REGIONS.map(r => `<button type="button" class="chip ${state.region === r ? 'on-accent' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+      <div class="field"><div class="lbl">직접 동네 고르기 <small>전국 시·도 선택</small></div>
+        ${renderSidoPickerHtml(state.sido, state.sigungu, 'r')}
       </div>`,
     onMount(sh) {
       const drawMap = () => {
@@ -2384,32 +2509,36 @@ function openRegionSheet() {
           }
           return;
         }
-        // 간이 지도(SVG) + 반경 표시
+        // 간이 지도(SVG) + 반경 표시 (서울은 자치구 폴리곤, 그 외 시·도는 중심 그리드)
         const [px, py] = proj(lng, lat);
         const span = state.rangeKm === 2 ? 0.06 : 0.11;
         const w = span * COSL * 4000, h = span * 4000 * 0.65;
         const radiusPx = state.rangeKm > 0 ? (state.rangeKm / 111) * 4000 : 0;
-        el.innerHTML = `<svg viewBox="${(px - w / 2).toFixed(1)} ${(py - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block"><g fill="var(--map-land)" stroke="var(--map-line)" stroke-width="1.2">${GEO_PATHS}</g>${radiusPx ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 3"/>` : ''}<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4.5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/></svg>`;
+        if (guAt(lat, lng)) {
+          el.innerHTML = `<svg viewBox="${(px - w / 2).toFixed(1)} ${(py - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block"><g fill="var(--map-land)" stroke="var(--map-line)" stroke-width="1.2">${GEO_PATHS}</g>${radiusPx ? `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="var(--accent)" fill-opacity=".16" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 3"/>` : ''}<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4.5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/></svg>`;
+        } else {
+          el.innerHTML = renderNationwideFallbackSvg(px, py, w, h, radiusPx, lbl);
+        }
       };
 
       drawMap();
       initSegs(sh);
+
+      const picker = bindSidoPicker(sh, {sido:state.sido, sigungu:state.sigungu}, resolved => {
+        state.sido = resolved.sido;
+        state.sigungu = resolved.sigungu;
+        state.region = resolved.region;
+        state.dong = resolved.dong;
+        state.loc = resolved.loc;
+        state.locVerified = false;
+        drawMap();
+      }, 'r');
 
       $('#rRange', sh).addEventListener('click', e => {
         const b = e.target.closest('button'); if (!b) return;
         state.rangeKm = +b.dataset.v;
         $$('#rRange button', sh).forEach(x => x.classList.toggle('on', x === b));
         initSegs(sh);
-        drawMap();
-      });
-
-      $('#rGrid', sh).addEventListener('click', e => {
-        const b = e.target.closest('[data-v]'); if (!b) return;
-        state.region = b.dataset.v;
-        state.dong = '';
-        state.loc = CENT[state.region] ? {lat:CENT[state.region][0], lng:CENT[state.region][1]} : {lat:SEOUL_CENTER[0], lng:SEOUL_CENTER[1]};
-        state.locVerified = false;
-        $$('#rGrid .chip', sh).forEach(x => x.classList.toggle('on-accent', x === b));
         drawMap();
       });
 
@@ -2420,11 +2549,14 @@ function openRegionSheet() {
         btn.innerHTML = '<span class="loc-spin"></span><span>현재 위치를 확인하는 중…</span>';
         try {
           const res = await detectCurrentNeighborhood();
+          const inf = LOC.inferSidoFromProfile ? LOC.inferSidoFromProfile(res.region, res.dong, SEOUL_GU) : {sido:'서울특별시', sigungu:res.region};
+          state.sido = inf.sido;
+          state.sigungu = inf.sigungu;
           state.region = res.region;
           state.dong = res.dong;
           state.loc = {lat:res.lat, lng:res.lng};
           state.locVerified = true;
-          $$('#rGrid .chip', sh).forEach(x => x.classList.toggle('on-accent', x.dataset.v === state.region));
+          picker.sync(inf.sido, inf.sigungu);
           drawMap();
           toast(`${res.fullLabel} 인증이 완료됐어요!`);
         } catch (ex) {
@@ -2533,7 +2665,8 @@ function openNearbyMapSheet() {
           const [ix, iy] = proj(coords.lng, coords.lat);
           return `<g class="svg-item-pin" data-item-pin="${item.id}" style="cursor:pointer"><circle cx="${ix.toFixed(1)}" cy="${iy.toFixed(1)}" r="4.8" fill="${item.id === selectedId ? 'var(--accent)' : 'var(--contrast)'}" stroke="#fff" stroke-width="1.4"/><text x="${ix.toFixed(1)}" y="${(iy - 7).toFixed(1)}" text-anchor="middle" font-size="4.6" font-weight="700" fill="var(--text)">${esc(item.title.slice(0, 8))}</text></g>`;
         }).join('');
-        canvas.innerHTML = `<svg viewBox="${(cx - w / 2).toFixed(1)} ${(cy - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block"><g fill="var(--map-land)" stroke="var(--map-line)" stroke-width=".9">${GEO_PATHS}</g><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--good)" stroke="#fff" stroke-width="1.4"/>${svgMarks}</svg>`;
+        const inSeoul = !!guAt(cLat, cLng);
+        canvas.innerHTML = `<svg viewBox="${(cx - w / 2).toFixed(1)} ${(cy - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block">${inSeoul ? `<g fill="var(--map-land)" stroke="var(--map-line)" stroke-width=".9">${GEO_PATHS}</g>` : `<rect x="${(cx - w).toFixed(1)}" y="${(cy - h).toFixed(1)}" width="${(w * 2).toFixed(1)}" height="${(h * 2).toFixed(1)}" fill="var(--map-land)"/>`}<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="var(--good)" stroke="#fff" stroke-width="1.4"/>${svgMarks}</svg>`;
       };
 
       if (KAKAO_READY && window.kakao && kakao.maps) {
@@ -2618,21 +2751,21 @@ function openWantsSheet() {
 /* ============ 프로필 · 비밀번호 변경 · 회원 탈퇴 ============ */
 function openProfileSheet() {
   const p = profileOf(App.me);
+  const inferred = LOC.inferSidoFromProfile ? LOC.inferSidoFromProfile(p.region, p.dong, SEOUL_GU) : {sido:'서울특별시', sigungu:p.region || ''};
   let region = p.region, dong = p.dong || '', loc = p.loc || null, locVerified = !!p.locVerified;
-  openSheet({title:'프로필 수정', full:true, foot:'<button class="btn btn-primary btn-block" id="pSave">저장하기</button>', body:`<div class="field"><label for="pNick">닉네임</label><input class="input" id="pNick" maxlength="10" value="${esc(p.nickname)}"><div class="hint" id="pHint"></div></div><div class="field"><div class="lbl">내 동네</div><button type="button" class="loc-btn" id="pGpsBtn" style="margin-bottom:10px">${I.gps}<span>현재 위치로 내 동네 찾기</span></button><div id="pGpsStatus" style="margin-bottom:10px">${locVerified && region ? `<div class="loc-verified">${I.check}<span>${esc(dong ? `${region} · ${dong}` : region)} 확인됨</span></div>` : ''}</div><div class="region-grid" id="pRegion">${REGIONS.map(r => `<button type="button" class="chip ${region === r ? 'on-accent' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>`, onMount(sh) {
-    $('#pRegion', sh).addEventListener('click', e => {
-      const b = e.target.closest('[data-v]'); if (!b) return;
-      region = b.dataset.v; dong = ''; loc = CENT[region] ? {lat:CENT[region][0], lng:CENT[region][1]} : null; locVerified = false;
-      $$('#pRegion .chip', sh).forEach(x => x.classList.toggle('on-accent', x === b));
-      $('#pGpsStatus', sh).innerHTML = '';
-    });
+  openSheet({title:'프로필 수정', full:true, foot:'<button class="btn btn-primary btn-block" id="pSave">저장하기</button>', body:`<div class="field"><label for="pNick">닉네임</label><input class="input" id="pNick" maxlength="10" value="${esc(p.nickname)}"><div class="hint" id="pHint"></div></div><div class="field"><div class="lbl">내 동네</div><button type="button" class="loc-btn" id="pGpsBtn" style="margin-bottom:10px">${I.gps}<span>현재 위치로 내 동네 찾기</span></button><div id="pGpsStatus" style="margin-bottom:10px">${region ? `<div class="loc-verified">${I.check}<span>${esc(LOC.userRegionLabel ? LOC.userRegionLabel({region, dong}) : (dong ? `${region} · ${dong}` : region))}${locVerified ? ' 확인됨' : ''}</span></div>` : ''}</div>${renderSidoPickerHtml(inferred.sido, inferred.sigungu, 'p')}</div>`, onMount(sh) {
+    const picker = bindSidoPicker(sh, {sido:inferred.sido, sigungu:inferred.sigungu}, resolved => {
+      region = resolved.region; dong = resolved.dong; loc = resolved.loc; locVerified = false;
+      $('#pGpsStatus', sh).innerHTML = `<div class="loc-verified">${I.check}<span>${esc(resolved.label)} 선택됨</span></div>`;
+    }, 'p');
     $('#pGpsBtn', sh).addEventListener('click', async e => {
       const btn = e.currentTarget, orig = btn.innerHTML;
       btn.disabled = true; btn.innerHTML = '<span class="loc-spin"></span><span>현재 위치를 확인하는 중…</span>';
       try {
         const res = await detectCurrentNeighborhood();
+        const inf = LOC.inferSidoFromProfile ? LOC.inferSidoFromProfile(res.region, res.dong, SEOUL_GU) : {sido:'서울특별시', sigungu:res.region};
         region = res.region; dong = res.dong; loc = {lat:res.lat, lng:res.lng}; locVerified = true;
-        $$('#pRegion .chip', sh).forEach(x => x.classList.toggle('on-accent', x.dataset.v === region));
+        picker.sync(inf.sido, inf.sigungu);
         $('#pGpsStatus', sh).innerHTML = `<div class="loc-verified">${I.check}<span>${esc(res.fullLabel)} 확인됨</span></div>`;
         toast(`${res.fullLabel}으로 설정했어요!`);
       } catch (ex) { toast(ex.message || '현재 위치를 확인하지 못했어요.'); }

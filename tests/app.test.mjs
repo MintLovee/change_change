@@ -282,4 +282,44 @@ describe('바꿀래 핵심 로직 단위 테스트', () => {
     const within2km = LOC.filterAndSortItems(items, { rangeKm: 2, sortBy: 'recent', myCoords, cent: ctx.CENT });
     assert.deepEqual(within2km.map(x => x.item.id), ['near']);
   });
+
+  it('LOC: 전국 17개 시·도 선택, 시·군·구 매핑, 좌표 추론을 정확히 처리한다', () => {
+    const LOC = ctx.LOC;
+    assert.equal(LOC.SIDO_DATA.length, 17);
+
+    const seoulSel = LOC.resolveRegionSelection('서울특별시', '마포구');
+    assert.equal(seoulSel.region, '마포구');
+    assert.equal(seoulSel.dong, '');
+    assert.equal(seoulSel.label, '마포구');
+
+    const jnSel = LOC.resolveRegionSelection('전라남도', '여수시');
+    assert.equal(jnSel.region, '전라남도');
+    assert.equal(jnSel.dong, '여수시');
+    assert.equal(jnSel.label, '전라남도 · 여수시');
+    assert.ok(jnSel.loc.lat < 35 && jnSel.loc.lng > 127);
+
+    const icSel = LOC.resolveRegionSelection('인천광역시', '연수구');
+    assert.equal(icSel.region, '인천');
+    assert.equal(icSel.dong, '연수구');
+
+    const sjSel = LOC.resolveRegionSelection('세종특별자치시', '세종시 전체');
+    assert.equal(sjSel.region, '세종특별자치시');
+    assert.equal(sjSel.dong, '');
+
+    assert.deepEqual({ ...LOC.inferSidoFromProfile('전라남도', '여수시', Object.keys(ctx.CENT)) }, { sido: '전라남도', sigungu: '여수시' });
+    assert.deepEqual({ ...LOC.inferSidoFromProfile('마포구', '서교동', Object.keys(ctx.CENT)) }, { sido: '서울특별시', sigungu: '마포구' });
+    assert.ok(LOC.regionCoords('전라남도', '여수시', ctx.CENT));
+
+    const jnKakao = { ...LOC.parseKakaoRegionResult([
+      { region_type: 'H', region_1depth_name: '전라남도', region_2depth_name: '여수시', region_3depth_name: '둔덕동' },
+    ], ctx.REGIONS) };
+    assert.deepEqual(jnKakao, { region: '전라남도', dong: '여수시 둔덕동', fullLabel: '전라남도 여수시 둔덕동' });
+  });
+
+  it('krError: 채팅·스토리지 관련 오류 코드를 명확한 한국어로 안내한다', () => {
+    assert.match(ctx.krError({ code: 'PGRST202', message: 'Could not find the function public.mark_chat_read' }), /schema\.sql/);
+    assert.match(ctx.krError({ code: 'PGRST205', message: 'Could not find the table public.messages' }), /schema\.sql/);
+    assert.match(ctx.krError({ message: 'Bucket not found' }), /item-photos/);
+    assert.match(ctx.krError({ code: '23514', message: 'new row violates check constraint' }), /형식이 맞지 않아요/);
+  });
 });
